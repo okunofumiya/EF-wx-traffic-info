@@ -1,0 +1,19 @@
+name = "keihou-dashboard"
+main = "src/index.js"
+compatibility_date = "2026-10-01"
+
+# 5分ごとに気象庁から取得する
+[triggers]
+crons = ["*/5 * * * *"]
+
+# デプロイ前に `wrangler kv namespace create KV` で作成し、id を設定する
+[[kv_namespaces]]
+binding = "KV"
+id = "b97c108d98e84a7a9ea85d8b85543120"
+
+[vars]
+CHATWORK_ROOM_ID = "451404707"
+# CHATWORK_API_TOKEN は平文で保存せず、Cloudflare Secret として登録する:
+# npx wrangler secret put CHATWORK_API_TOKEN
+
+

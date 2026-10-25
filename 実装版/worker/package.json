@@ -1,0 +1,9 @@
+{
+  "name": "keihou-dashboard-worker",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test test/*.test.mjs",
+    "sample": "node test/run-sample.mjs"
+  }
+}

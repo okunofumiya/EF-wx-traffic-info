@@ -1,0 +1,9 @@
+{
+  // ダッシュボードの画面（../public）を静的ファイルとして公開する設定。
+  // データ配信用の Worker（../worker）とは別物。このフォルダで `npx wrangler deploy` する
+  "name": "keihou-dashboard-web",
+  "compatibility_date": "2026-10-01",
+  "assets": {
+    "directory": "../public"
+  }
+}

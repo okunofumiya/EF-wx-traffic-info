@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="description" content="リハビリテーション科職員向け 通勤影響情報ダッシュボード（気象警報・今後の見込み）">
+  <meta name="theme-color" content="#0b1020">
+  <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
+  <link rel="manifest" href="manifest.json">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="警報・運行">
+  <meta name="application-name" content="警報・運行">
+  <title>通勤影響ダッシュボード | リハビリテーション科</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;900&family=Outfit:wght@400;600;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="bg-orbs" aria-hidden="true"><span></span><span></span><span></span></div>
+
+  <header class="app-header">
+    <div class="header-row">
+      <div>
+        <p class="eyebrow">リハビリテーション科</p>
+        <h1>通勤影響ダッシュボード</h1>
+      </div>
+      <button id="refresh-btn" class="icon-btn" aria-label="更新">
+        <svg viewBox="0 0 24 24" width="22" height="22"><path fill="currentColor" d="M12 4a8 8 0 0 1 7.75 6h-2.1A6 6 0 1 0 18 14h2.07A8 8 0 1 1 12 4Zm5-1 4 4-4 4V3Z"/></svg>
+      </button>
+    </div>
+    <div class="header-meta">
+      <span class="live-dot"></span>
+      <span id="updated-at">最終更新 --:--</span>
+      <span class="demo-badge" id="src-badge">--</span>
+    </div>
+    <div class="view-switch" role="tablist" aria-label="表示範囲">
+      <button class="view-btn active" data-view="all" id="view-all">👥 全体表示</button>
+      <button class="view-btn" data-view="mine" id="view-mine">★ マイ表示</button>
+      <button class="active-only" id="active-only" aria-pressed="false">⚠ 情報ありのみ</button>
+      <button class="view-edit" id="view-edit" aria-label="マイ設定の説明">？</button>
+    </div>
+  </header>
+
+  <main>
+    <div id="load-error" class="card load-error" role="alert" hidden>
+      <p id="load-error-text"></p>
+      <button id="load-retry" class="sheet-close">再読み込み</button>
+    </div>
+
+    <!-- 総合ステータス -->
+    <section id="summary" class="section">
+      <div id="hero" class="hero card">
+        <div class="hero-level">
+          <span id="hero-icon" class="hero-icon"></span>
+          <div>
+            <p class="hero-label">現在の通勤影響</p>
+            <h2 id="hero-title">--</h2>
+          </div>
+        </div>
+        <p id="hero-text" class="hero-text"></p>
+        <div class="hero-stats">
+          <div class="stat"><span id="stat-warn" class="stat-num">0</span><span class="stat-cap">警報の地域</span></div>
+          <div class="stat"><span id="stat-adv" class="stat-num">0</span><span class="stat-cap">注意報の地域</span></div>
+          <div class="stat"><span id="stat-train" class="stat-num">0</span><span class="stat-cap">運行に影響</span></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 警報 -->
+    <section id="warnings" class="section">
+      <div class="section-head">
+        <h2>居住地の警報・注意報</h2>
+        <span id="area-count" class="count-pill"></span>
+      </div>
+      <div class="legend">
+        <span class="lg lg-emergency">特別警報</span>
+        <span class="lg lg-danger">危険警報</span>
+        <span class="lg lg-warning">警報</span>
+        <span class="lg lg-advisory">注意報</span>
+      </div>
+      <div id="area-groups"></div>
+    </section>
+
+    <!-- 運行情報 -->
+    <section id="trains" class="section">
+      <div class="section-head"><h2>鉄道運行情報</h2><span id="train-count" class="count-pill"></span></div>
+      <div id="train-list" class="train-list"></div>
+    </section>
+
+    <!-- 今後の見込み -->
+    <section id="outlook" class="section">
+      <div class="section-head"><h2>今後の見込み</h2></div>
+
+      <div class="card">
+        <h3 class="card-title">警報の解除見込み</h3>
+        <div id="tl-tabs" class="tl-tabs" role="tablist" aria-label="地域を選択"></div>
+        <div id="timeline" class="timeline-wrap"></div>
+        <p id="tl-note" class="note"></p>
+      </div>
+
+      <div class="card">
+        <h3 class="card-title">5日先までの警報級の可能性（兵庫県南部）</h3>
+        <div id="early-grid" class="early-grid"></div>
+        <p id="early-text" class="note"></p>
+        <p class="note">［高］警報級になる可能性が高い ／［中］可能性がある</p>
+      </div>
+    </section>
+
+    <!-- BAND -->
+    <section id="band" class="section">
+      <div class="section-head"><h2>BAND 投稿履歴（プレビュー）</h2></div>
+      <div id="band-list" class="band-list"></div>
+    </section>
+
+    <footer class="app-footer">
+      <p>気象情報：気象庁の公開データをもとに作成しています。</p>
+      <p>詳しい天気は各市町の「天気」リンク（Yahoo!天気）から確認できます。</p>
+      <p>鉄道運行情報・BAND投稿は準備中です。</p>
+      <p class="ver">v0.4.0-dev</p>
+    </footer>
+  </main>
+
+  <nav class="bottom-nav" aria-label="セクション移動">
+    <a href="#summary" class="nav-item active" id="nav-summary"><svg viewBox="0 0 24 24"><path d="M4 13h7V4H4v9Zm0 7h7v-5H4v5Zm9 0h7v-9h-7v9Zm0-16v5h7V4h-7Z"/></svg><span>概要</span></a>
+    <a href="#warnings" class="nav-item" id="nav-warnings"><svg viewBox="0 0 24 24"><path d="M1 21h22L12 2 1 21Zm12-3h-2v-2h2v2Zm0-4h-2v-4h2v4Z"/></svg><span>警報</span></a>
+    <a href="#trains" class="nav-item" id="nav-trains"><svg viewBox="0 0 24 24"><path d="M12 2c-4 0-8 .5-8 4v9.5A3.5 3.5 0 0 0 7.5 19L6 20.5v.5h12v-.5L16.5 19a3.5 3.5 0 0 0 3.5-3.5V6c0-3.5-4-4-8-4ZM7.5 17a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3ZM11 10H6V6h5v4Zm2 0V6h5v4h-5Zm3.5 7a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3Z"/></svg><span>運行</span></a>
+    <a href="#outlook" class="nav-item" id="nav-outlook"><svg viewBox="0 0 24 24"><path d="M19 3h-1V1h-2v2H8V1H6v2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2Zm0 16H5V8h14v11Z"/></svg><span>見込み</span></a>
+    <a href="#band" class="nav-item" id="nav-band"><svg viewBox="0 0 24 24"><path d="M20 2H4a2 2 0 0 0-2 2v18l4-4h14a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2Z"/></svg><span>BAND</span></a>
+  </nav>
+
+  <div id="toast" class="toast" role="status"></div>
+
+  <div id="help-sheet" class="sheet" hidden>
+    <div class="sheet-body card">
+      <h3 class="card-title">★ マイ表示について</h3>
+      <ul class="help-list">
+        <li>各地域・各路線の <b>★</b> をタップすると「マイ設定」に登録されます。</li>
+        <li>マイ設定は <b>この端末（ブラウザ）だけ</b> に保存されます。ほかの職員の画面には影響しません。ログインも不要です。</li>
+        <li><b>全体表示</b>：すべての地域・路線を表示します（管理者向け）。</li>
+        <li><b>マイ表示</b>：★を付けた地域・路線だけを表示します。上部の件数もマイ設定の範囲で数えます。</li>
+        <li><b>情報ありのみ</b>：警報・注意報が出ている地域と、遅延・運休がある路線だけを表示します。全体／マイ表示のどちらとも組み合わせられます。</li>
+        <li><b>解除見込み</b>：マイ表示では★の地域、全体表示では警報・注意報が出ている地域を危険度順に切り替えて見られます。</li>
+      </ul>
+      <button id="help-close" class="sheet-close">閉じる</button>
+    </div>
+  </div>
+
+  <script src="data.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
