@@ -1,6 +1,0 @@
-{
-  "version": "0.0.1",
-  "configurations": [
-    { "name": "dashboard", "runtimeExecutable": "node", "runtimeArgs": ["C:/Users/fumiy/AppData/Local/Temp/claude/C--Users-fumiy-OneDrive-Antigravity------/868e4999-b2fe-4710-bd29-e962d354aaec/scratchpad/serve.mjs", "C:/Users/fumiy/OneDrive/Antigravity/警報等通知/実装版/public", "5174"], "port": 5174 }
-  ]
-}

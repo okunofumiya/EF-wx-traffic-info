@@ -19,3 +19,8 @@ desktop.ini
 # IDE & Editor
 .vscode/
 .idea/
+.claude/
+
+# WorkLog (ローカルOneDrive上で作業状況を管理するため、Git管理からは除外)
+WorkLog/
+
