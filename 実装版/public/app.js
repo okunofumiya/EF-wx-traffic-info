@@ -1,4 +1,4 @@
-/* 気象・交通状況ダッシュボード v0.7.0-dev（気象：スナップショット対応／神鉄運行情報連携／BAND：準備中） */
+/* 気象・交通状況ダッシュボード v0.7.1-dev（気象：スナップショット対応／神鉄運行情報連携／BAND：準備中） */
 (() => {
   const LV_ORDER = { emergency: 4, danger: 3, warning: 2, advisory: 1 };
   const LV_CLASS = ["none", "advisory", "warning", "danger", "emergency"];
@@ -11,6 +11,13 @@
   let tlArea = null; // 解除見込みで選択中の地域
   const pins = new Set(JSON.parse(localStorage.getItem("pins") || "[]"));
   const linePins = new Set(JSON.parse(localStorage.getItem("linePins") || "[]"));
+  // 以前の神鉄路線ID（shintetsu-ao / shintetsu-arima）をお気に入り登録していた場合の自動引き継ぎ
+  if (linePins.has("shintetsu-ao") || linePins.has("shintetsu-arima")) {
+    linePins.add("shintetsu");
+    linePins.delete("shintetsu-ao");
+    linePins.delete("shintetsu-arima");
+    localStorage.setItem("linePins", JSON.stringify([...linePins]));
+  }
   const expanded = new Set();
   const mine = () => view === "mine";
   const allAreas = () => model.groups.flatMap((g) => g.areas);
@@ -18,7 +25,7 @@
   const visibleAreas = () => allAreas().filter((a) => !mine() || pins.has(a));
 
   const getLineStatus = (lineId) => {
-    if (lineId.startsWith("shintetsu-")) {
+    if (lineId === "shintetsu" || lineId.startsWith("shintetsu-")) {
       return shintetsuStatus || { status: "na", label: "確認中", cls: "status-na", hasAlert: false, text: "運行情報は公式HPでご確認ください" };
     }
     return { status: "na", label: "準備中", cls: "status-na", hasAlert: false, text: "" };
@@ -202,7 +209,7 @@
       '<p class="note train-note">※ 神戸電鉄は公式ページの運行有無を自動反映しています（JR・山陽は準備中）。詳細・最新状況は各社の公式ページをご確認ください。</p>' +
       scope.map((l, i) => {
         const st = getLineStatus(l.id);
-        const isShintetsu = l.id.startsWith("shintetsu-");
+        const isShintetsu = l.id === "shintetsu" || l.id.startsWith("shintetsu-");
         return `
         <article class="card train ${st.hasAlert ? "train-alert" : ""}" id="train-${l.id}" style="--line:${l.color};animation-delay:${i * 60}ms">
           <span class="train-color"></span>

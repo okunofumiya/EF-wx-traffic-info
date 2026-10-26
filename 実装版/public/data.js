@@ -40,8 +40,7 @@ function parseShintetsuStatus(data) {
 const TRAIN_LINES = [
   { id: "jr-kobe", name: "JR神戸線", section: "姫路〜三ノ宮", color: "#1e6fd9", url: "https://www.train-guide.westjr.co.jp/" },
   { id: "jr-kakogawa", name: "JR加古川線", section: "加古川〜谷川", color: "#14b8a6", url: "https://www.train-guide.westjr.co.jp/" },
-  { id: "shintetsu-ao", name: "神戸電鉄 粟生線", section: "鈴蘭台〜粟生", color: "#f97316", url: "https://www.shintetsu.co.jp/railinfo/" },
-  { id: "shintetsu-arima", name: "神戸電鉄 有馬線・三田線", section: "湊川〜有馬温泉／三田", color: "#fb923c", url: "https://www.shintetsu.co.jp/railinfo/" },
+  { id: "shintetsu", name: "神戸電鉄 全線", section: "粟生線・有馬線・三田線など", color: "#f97316", url: "https://www.shintetsu.co.jp/railinfo/" },
   { id: "sanyo", name: "山陽電車 本線", section: "神戸三宮〜山陽姫路", color: "#e11d48", url: "https://www.sanyo-railway.co.jp/" },
 ];
 
