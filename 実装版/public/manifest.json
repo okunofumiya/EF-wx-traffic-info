@@ -1,12 +1,12 @@
 {
-  "name": "通勤影響ダッシュボード",
+  "name": "気象・交通状況ダッシュボード",
   "short_name": "警報・運行",
-  "description": "リハビリテーション科職員向け 気象警報・交通情報ダッシュボード",
+  "description": "職員向け 気象警報・交通情報ダッシュボード",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
-  "background_color": "#0b1020",
-  "theme_color": "#0b1020",
+  "background_color": "#eff8f7",
+  "theme_color": "#eff8f7",
   "orientation": "portrait-primary",
   "icons": [
     {

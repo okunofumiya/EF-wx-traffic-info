@@ -1,4 +1,4 @@
-/* 通勤影響ダッシュボード v0.4.0-dev（気象：スナップショット対応／鉄道・BAND：準備中） */
+/* 気象・交通状況ダッシュボード v0.4.0-dev（気象：スナップショット対応／鉄道・BAND：準備中） */
 (() => {
   const LV_ORDER = { emergency: 4, danger: 3, warning: 2, advisory: 1 };
   const LV_CLASS = ["none", "advisory", "warning", "danger", "emergency"];
@@ -113,14 +113,12 @@
         el.style.animationDelay = `${(delay++) * 25}ms`;
         el.innerHTML = `
           <div class="area-top">
+            <button class="pin ${pins.has(a) ? "on" : ""}" aria-label="${esc(a)}をマイ地域に登録" data-pin="${esc(a)}">★</button>
             <span class="area-name">${esc(a)}</span>
-            <span class="area-actions">
-              <a class="yahoo-link" href="${yahooUrl(model.codes[a])}" target="_blank" rel="noopener" aria-label="${esc(a)}のYahoo!天気を開く">天気<span aria-hidden="true">↗</span></a>
-              <button class="pin ${pins.has(a) ? "on" : ""}" aria-label="${esc(a)}をマイ地域に登録" data-pin="${esc(a)}">★</button>
-            </span>
-          </div>
-          <div class="tags">
-            ${list.length ? list.map((w) => `<span class="tag tag-${w.level}">${esc(w.type)}</span>`).join("") : '<span class="tag-none">発表なし</span>'}
+            <div class="tags">
+              ${list.length ? list.map((w) => `<span class="tag tag-${w.level}">${esc(w.type)}</span>`).join("") : '<span class="tag-none">発表なし</span>'}
+            </div>
+            <a class="yahoo-link" href="${yahooUrl(model.codes[a])}" target="_blank" rel="noopener" aria-label="${esc(a)}のYahoo!天気を開く">天気<span aria-hidden="true">↗</span></a>
           </div>
           <div class="area-detail">
             ${list.length ? list.map((w) => `
@@ -175,13 +173,13 @@
           <span class="train-color"></span>
           <div class="train-body">
             <div class="train-head">
-              <div>
+              <button class="pin ${linePins.has(l.id) ? "on" : ""}" aria-label="${l.name}をマイ路線に登録" data-line-pin="${l.id}">★</button>
+              <div class="train-id">
                 <div class="train-name">${l.name}</div>
                 <div class="train-section">${l.section}</div>
               </div>
               <div class="train-right">
                 <span class="status status-na">準備中</span>
-                <button class="pin ${linePins.has(l.id) ? "on" : ""}" aria-label="${l.name}をマイ路線に登録" data-line-pin="${l.id}">★</button>
               </div>
             </div>
             <a class="train-link" href="${l.url}" target="_blank" rel="noopener">公式の運行情報を見る ↗</a>
