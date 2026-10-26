@@ -4,11 +4,39 @@
 // ?src=URL で一時的に差し替えられる（サンプル確認は ?src=data/snapshot.sample.json）
 const SNAPSHOT_URL =
   new URLSearchParams(location.search).get("src") || "https://keihou-dashboard.keihou-dashboard-worker.workers.dev/api/snapshot";
+const SHINTETSU_URL =
+  new URLSearchParams(location.search).get("shintetsu_src") ||
+  (SNAPSHOT_URL.includes("/api/snapshot")
+    ? SNAPSHOT_URL.replace("/api/snapshot", "/api/shintetsu")
+    : "https://keihou-dashboard.keihou-dashboard-worker.workers.dev/api/shintetsu");
 const IS_SAMPLE = SNAPSHOT_URL.includes("sample");
 const STALE_MINUTES = 30; // これより古いスナップショットは「古い可能性」を表示する
 
+// 神戸電鉄の運行情報ステータス（規約配慮のため、平常か運行情報ありかのみ検知）
+function parseShintetsuStatus(data) {
+  if (!data || data.kind_code === undefined || data.kind_code === null) {
+    return { status: "na", label: "確認中", cls: "status-na", hasAlert: false, text: "運行情報は公式HPでご確認ください" };
+  }
+  const isNormal = String(data.kind_code) === "0";
+  if (isNormal) {
+    return {
+      status: "ok",
+      label: "平常運転",
+      cls: "status-ok",
+      hasAlert: false,
+      text: "現在、30分以上の遅れ等はありません",
+    };
+  }
+  return {
+    status: "delay",
+    label: "運行情報あり",
+    cls: "status-delay",
+    hasAlert: true,
+    text: "運行情報が発表されています。詳細は公式HPをご確認ください。",
+  };
+}
 
-// 鉄道は気象とは別に調査中のため、今は公式の運行情報ページへのリンクのみ
+// 鉄道路線設定（神戸電鉄はAPI連携、JR・山陽は公式ページへのリンク）
 const TRAIN_LINES = [
   { id: "jr-kobe", name: "JR神戸線", section: "姫路〜三ノ宮", color: "#1e6fd9", url: "https://www.train-guide.westjr.co.jp/" },
   { id: "jr-kakogawa", name: "JR加古川線", section: "加古川〜谷川", color: "#14b8a6", url: "https://www.train-guide.westjr.co.jp/" },

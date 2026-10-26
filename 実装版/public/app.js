@@ -1,10 +1,11 @@
-/* 気象・交通状況ダッシュボード v0.4.0-dev（気象：スナップショット対応／鉄道・BAND：準備中） */
+/* 気象・交通状況ダッシュボード v0.7.0-dev（気象：スナップショット対応／神鉄運行情報連携／BAND：準備中） */
 (() => {
   const LV_ORDER = { emergency: 4, danger: 3, warning: 2, advisory: 1 };
   const LV_CLASS = ["none", "advisory", "warning", "danger", "emergency"];
   const $ = (s) => document.querySelector(s);
 
   let model = null; // adaptSnapshot の結果
+  let shintetsuStatus = null; // parseShintetsuStatus の結果
   let view = localStorage.getItem("view") || "all";
   let activeOnly = localStorage.getItem("activeOnly") === "1";
   let tlArea = null; // 解除見込みで選択中の地域
@@ -15,7 +16,22 @@
   const allAreas = () => model.groups.flatMap((g) => g.areas);
   const hasInfo = (a) => (model.warnings[a] || []).length > 0;
   const visibleAreas = () => allAreas().filter((a) => !mine() || pins.has(a));
-  const visibleLines = () => TRAIN_LINES.filter((l) => !mine() || linePins.has(l.id));
+
+  const getLineStatus = (lineId) => {
+    if (lineId.startsWith("shintetsu-")) {
+      return shintetsuStatus || { status: "na", label: "確認中", cls: "status-na", hasAlert: false, text: "運行情報は公式HPでご確認ください" };
+    }
+    return { status: "na", label: "準備中", cls: "status-na", hasAlert: false, text: "" };
+  };
+
+  const visibleLines = () =>
+    TRAIN_LINES.filter((l) => {
+      if (mine() && !linePins.has(l.id)) return false;
+      if (activeOnly) {
+        return getLineStatus(l.id).hasAlert;
+      }
+      return true;
+    });
 
   const maxLevel = (list) =>
     (list || []).reduce((m, w) => (LV_ORDER[w.level] > (LV_ORDER[m] || 0) ? w.level : m), null);
@@ -53,8 +69,17 @@
       if (LV_ORDER[lv] >= 2) warn++; else adv++;
       if (!top || LV_ORDER[lv] > LV_ORDER[top]) top = lv;
     });
-    const trainNote = "鉄道の運行情報は、各社の公式ページでご確認ください。";
-    let level = "ok", icon = "✅", title = "気象の影響なし", text = `現在、対象地域に警報・注意報は出ていません。${trainNote}`;
+
+    // 鉄道の運行影響路線数をカウント（表示対象のスコープ内）
+    const trainScope = TRAIN_LINES.filter((l) => !mine() || linePins.has(l.id));
+    const trainAlertCount = trainScope.filter((l) => getLineStatus(l.id).hasAlert).length;
+
+    let trainNote = "鉄道の運行情報は、各社の公式ページでご確認ください。";
+    if (trainAlertCount > 0) {
+      trainNote = "神戸電鉄で運行情報が出ています。公式ページをご確認ください。";
+    }
+
+    let level = "ok", icon = "✅", title = "影響なし", text = `現在、対象地域に警報・注意報はなく、神鉄は平常運転です。${trainNote}`;
     if (warn > 0) {
       level = "alert"; icon = "🌀";
       title = top === "danger" || top === "emergency" ? "厳重警戒" : "通勤に影響あり";
@@ -62,7 +87,11 @@
     } else if (adv > 0) {
       level = "caution"; icon = "⚠️"; title = "注意";
       text = `${adv}地域に注意報が出ています。時間に余裕をもって出発してください。${trainNote}`;
+    } else if (trainAlertCount > 0) {
+      level = "caution"; icon = "🚃"; title = "交通影響あり";
+      text = `神戸電鉄で運行情報（遅延・運休等）が発表されています。時間に余裕をもって出発してください。${trainNote}`;
     }
+
     const hero = $("#hero");
     hero.dataset.level = level;
     $("#hero-icon").textContent = icon;
@@ -70,7 +99,7 @@
     $("#hero-text").textContent = text;
     countUp($("#stat-warn"), warn);
     countUp($("#stat-adv"), adv);
-    $("#stat-train").textContent = "−";
+    countUp($("#stat-train"), trainAlertCount);
     document.documentElement.style.setProperty("--orb3", level === "alert" ? "#f43f5e" : level === "caution" ? "#f59e0b" : "#10b981");
   }
 
@@ -158,18 +187,24 @@
     }
   }
 
-  // 鉄道は準備中。路線の一覧と、公式の運行情報ページへのリンクだけを出す
+  // 鉄道の運行情報（神鉄はAPI連携、JR・山陽は準備中）
   function renderTrains() {
     const scope = visibleLines();
-    $("#train-count").textContent = mine() ? `★ ${scope.length}路線` : `全${scope.length}路線`;
-    if (!scope.length) {
-      $("#train-list").innerHTML = '<p class="empty card">全体表示で ★ をタップして、マイ路線を登録してください</p>';
+    const scopeCount = scope.length;
+    $("#train-count").textContent = mine() ? `★ ${scopeCount}路線` : `全${scopeCount}路線`;
+    if (!scopeCount) {
+      $("#train-list").innerHTML = activeOnly
+        ? '<p class="empty card all-clear">✅ 現在、運行情報が出ている路線はありません（平常運転中または準備中）</p>'
+        : '<p class="empty card">全体表示で ★ をタップして、マイ路線を登録してください</p>';
       return;
     }
     $("#train-list").innerHTML =
-      '<p class="note train-note">運行情報の自動取得は準備中です。各社の公式ページでご確認ください。</p>' +
-      scope.map((l, i) => `
-        <article class="card train" id="train-${l.id}" style="--line:${l.color};animation-delay:${i * 60}ms">
+      '<p class="note train-note">※ 神戸電鉄は公式ページの運行有無を自動反映しています（JR・山陽は準備中）。詳細・最新状況は各社の公式ページをご確認ください。</p>' +
+      scope.map((l, i) => {
+        const st = getLineStatus(l.id);
+        const isShintetsu = l.id.startsWith("shintetsu-");
+        return `
+        <article class="card train ${st.hasAlert ? "train-alert" : ""}" id="train-${l.id}" style="--line:${l.color};animation-delay:${i * 60}ms">
           <span class="train-color"></span>
           <div class="train-body">
             <div class="train-head">
@@ -179,12 +214,14 @@
                 <div class="train-section">${l.section}</div>
               </div>
               <div class="train-right">
-                <span class="status status-na">準備中</span>
+                <span class="status ${st.cls}">${st.label}</span>
               </div>
             </div>
+            ${isShintetsu && st.text ? `<p class="train-msg ${st.hasAlert ? "alert" : ""}">${esc(st.text)}</p>` : ""}
             <a class="train-link" href="${l.url}" target="_blank" rel="noopener">公式の運行情報を見る ↗</a>
           </div>
-        </article>`).join("");
+        </article>`;
+      }).join("");
   }
 
   // 解除見込みに出す地域の候補（現在の警報＋これからの見通しの危険度が高い順）
