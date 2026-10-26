@@ -310,13 +310,34 @@
     toast._t = setTimeout(() => t.classList.remove("show"), 1800);
   }
 
-  // スナップショットの読み込み
+  // スナップショットおよび神鉄データの読み込み
   async function load({ manual = false } = {}) {
     try {
-      const res = await fetch(SNAPSHOT_URL, { cache: "no-store" });
-      if (!res.ok) throw new Error(res.status === 503 ? "データの準備ができていません" : `HTTP ${res.status}`);
-      model = adaptSnapshot(await res.json());
-      $("#load-error").hidden = true;
+      const [snapRes, shinRes] = await Promise.allSettled([
+        fetch(SNAPSHOT_URL, { cache: "no-store" }),
+        fetch(SHINTETSU_URL, { cache: "no-store" }),
+      ]);
+
+      if (snapRes.status === "fulfilled" && snapRes.value.ok) {
+        model = adaptSnapshot(await snapRes.value.json());
+        $("#load-error").hidden = true;
+      } else {
+        const errStatus = snapRes.status === "fulfilled" ? snapRes.value.status : "接続エラー";
+        throw new Error(errStatus === 503 ? "データの準備ができていません" : `HTTP ${errStatus}`);
+      }
+
+      if (shinRes.status === "fulfilled" && shinRes.value.ok) {
+        try {
+          const shinData = await shinRes.value.json();
+          shintetsuStatus = parseShintetsuStatus(shinData);
+        } catch (e) {
+          console.warn("神鉄データの解析エラー:", e);
+          shintetsuStatus = parseShintetsuStatus(null);
+        }
+      } else {
+        shintetsuStatus = parseShintetsuStatus(null);
+      }
+
       render();
       if (manual) toast("最新の情報に更新しました");
     } catch (e) {

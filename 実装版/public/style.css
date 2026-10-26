@@ -151,7 +151,9 @@ main { padding: 0 14px; max-width: 640px; margin: 0 auto; }
 .status-delay { background: #f2b200; color: #4a3200; }
 .status-stop { background: var(--warning-soft); color: #b3453c; }
 .status-na { background: var(--surface-2); color: var(--muted); }
-.train-msg { font-size: 12px; line-height: 1.8; margin-top: 8px; }
+.train-msg { font-size: 12px; line-height: 1.8; margin-top: 8px; color: var(--muted); }
+.train-msg.alert { color: #b3453c; font-weight: 700; }
+.train.train-alert { border-color: #f0b4ae; background: #fff8f7; }
 .train-time { font-size: 11px; color: var(--muted); margin-top: 6px; }
 
 /* タイムライン */
