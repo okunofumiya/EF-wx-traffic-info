@@ -3,7 +3,10 @@
 // 読み込むスナップショット。Workers の /api/snapshot（本番）。
 // ?src=URL で一時的に差し替えられる（サンプル確認は ?src=data/snapshot.sample.json）
 const SNAPSHOT_URL =
-  new URLSearchParams(location.search).get("src") || "https://keihou-dashboard.keihou-dashboard-worker.workers.dev/api/snapshot";
+  (() => { const q = new URLSearchParams(location.search).get("src");
+    // ローカル確認用: 既定はサンプルデータ。?src=live で本番の読み取り専用データを表示
+    if (q === "live") return "https://keihou-dashboard.keihou-dashboard-worker.workers.dev/api/snapshot";
+    return q || "data/snapshot.sample.json"; })();
 const IS_SAMPLE = SNAPSHOT_URL.includes("sample");
 const STALE_MINUTES = 30; // これより古いスナップショットは「古い可能性」を表示する
 
