@@ -9,12 +9,16 @@ import {
   buildWeatherAlertMessage,
   buildShintetsuAlertMessage,
 } from "./chatwork.js";
+import { fetchGoogleTraffic } from "./traffic.js";
 
 const KEY_SNAPSHOT = "snapshot";
 const KEY_CHECKED = "checkedAt"; // 最後に気象庁から取得できた時刻
 const KEY_EVENTS = "events"; // 直近の変化
 const KEY_SHINTETSU = "shintetsu_summary"; // 神戸電鉄の直近ステータス
+const KEY_TRAFFIC = "traffic_snapshot"; // 道路交通情報
+const KEY_TRAFFIC_CHECKED = "traffic_checkedAt"; // 道路情報の取得時刻
 const MAX_EVENTS = 100;
+const TRAFFIC_CACHE_MS = 5 * 60 * 1000; // 5分キャッシュ
 
 async function fetchJson(url) {
   const res = await fetch(url, { headers: { "User-Agent": "keihou-dashboard/0.1" } });
@@ -94,6 +98,42 @@ export default {
 
   async fetch(request, env) {
     const { pathname } = new URL(request.url);
+
+    // 道路交通情報API (/api/traffic)
+    if (pathname === "/api/traffic") {
+      try {
+        const lastCheckedStr = await env.KV.get(KEY_TRAFFIC_CHECKED);
+        const lastChecked = lastCheckedStr ? Number(lastCheckedStr) : 0;
+        const now = Date.now();
+
+        // 5分以内のキャッシュがあればそれを返す
+        if (now - lastChecked < TRAFFIC_CACHE_MS) {
+          const cached = await env.KV.get(KEY_TRAFFIC);
+          if (cached) {
+            return new Response(cached, {
+              headers: { "Content-Type": "application/json; charset=utf-8", ...CORS },
+            });
+          }
+        }
+
+        // キャッシュ切れまたは初回: Google Maps API またはモック生成
+        const trafficData = await fetchGoogleTraffic(env.GOOGLE_MAPS_API_KEY, now);
+        const jsonBody = JSON.stringify(trafficData);
+        await env.KV.put(KEY_TRAFFIC, jsonBody);
+        await env.KV.put(KEY_TRAFFIC_CHECKED, String(now));
+
+        return new Response(jsonBody, {
+          headers: { "Content-Type": "application/json; charset=utf-8", ...CORS },
+        });
+      } catch (err) {
+        console.error("Traffic API error:", err);
+        return new Response(JSON.stringify({ error: err.message }), {
+          status: 500,
+          headers: { "Content-Type": "application/json; charset=utf-8", ...CORS },
+        });
+      }
+    }
+
     const key =
       pathname === "/api/snapshot"
         ? KEY_SNAPSHOT

@@ -275,3 +275,132 @@ body.mine .count-pill { color: #4a3200; background: #ffe27a; border-color: #f2b2
 .load-error { margin: 12px 0; text-align: center; border-color: #f0b4ae; background: var(--warning-soft); font-size: 13px; line-height: 1.7; }
 .load-error p { margin-bottom: 10px; }
 .load-error[hidden] { display: none; }
+
+/* 道路交通情報（所要時間・路線マップ） */
+.road-controls {
+  display: flex; justify-content: space-between; align-items: center; gap: 8px;
+  margin-bottom: 12px; flex-wrap: wrap;
+}
+.road-dir-switch, .road-view-switch {
+  display: flex; background: var(--surface-2); padding: 3px; border-radius: 999px;
+  border: 1px solid var(--border);
+}
+.road-dir-btn, .road-vbtn {
+  padding: 6px 12px; border-radius: 999px; font-size: 12px; font-weight: 700;
+  color: var(--muted); transition: all .2s ease; display: inline-flex; align-items: center; gap: 4px;
+}
+.road-dir-btn small { font-size: 10px; opacity: .8; font-weight: 500; }
+.road-dir-btn.active, .road-vbtn.active {
+  background: var(--surface); color: var(--text); box-shadow: 0 2px 8px rgba(30,110,110,.12);
+}
+.road-legend { margin-bottom: 12px; }
+.lg-road {
+  display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px;
+  border-radius: 999px; font-size: 11px; font-weight: 700;
+}
+.lg-road-normal { background: var(--ok-soft); color: #1e7047; }
+.lg-road-crowded { background: var(--advisory-soft); color: #855b00; }
+.lg-road-heavy { background: var(--warning-soft); color: #ad2b20; }
+.road-source-note { margin-left: auto; font-size: 10px; }
+
+/* SVG 路線図カード */
+.road-map-card { padding: 14px 10px 10px; overflow: hidden; }
+.road-map-wrapper { width: 100%; position: relative; border-radius: 14px; background: #fbfdfd; border: 1px solid var(--border); }
+#road-svg-map { width: 100%; height: auto; display: block; overflow: visible; }
+.map-hint { text-align: center; margin-top: 8px; font-size: 11px; }
+
+/* SVG 内部スタイル */
+.svg-edge-path {
+  fill: none; stroke-linecap: round; stroke-linejoin: round;
+  transition: stroke .3s, stroke-width .2s, filter .3s;
+}
+.svg-edge-path.road-r175 { stroke: #10b981; }
+.svg-edge-path.road-higashiharima { stroke: #a855f7; }
+.svg-edge-path.road-bypass { stroke: #ef4444; }
+.svg-edge-path.road-meiki { stroke: #3b82f6; }
+.svg-edge-path.road-connector { stroke: #94a3b8; stroke-dasharray: 4 4; stroke-width: 3; }
+
+/* 渋滞時の発光・強調 */
+.svg-edge-path.status-crowded { stroke: #eab308 !important; }
+.svg-edge-path.status-heavy { stroke: #dc2626 !important; stroke-width: 9 !important; filter: drop-shadow(0 0 6px rgba(220,38,38,.5)); }
+
+/* ノード（交差点・IC） */
+.svg-node-circle { fill: #ffffff; stroke-width: 3px; cursor: pointer; transition: transform .2s; }
+.svg-node-label { font-size: 11px; font-weight: 700; fill: var(--text); user-select: none; pointer-events: none; }
+.svg-node-label-sub { font-size: 9px; fill: var(--muted); }
+
+/* 所要時間バッジ */
+.svg-badge-group { cursor: pointer; transition: transform .15s ease; }
+.svg-badge-group:hover, .svg-badge-group:active { transform: scale(1.1); }
+.svg-badge-rect { rx: 12; ry: 12; filter: drop-shadow(0 2px 6px rgba(0,0,0,.15)); }
+.svg-badge-rect.status-normal { fill: #ffffff; stroke: #10b981; stroke-width: 2; }
+.svg-badge-rect.status-crowded { fill: #fffbeb; stroke: #eab308; stroke-width: 2.5; }
+.svg-badge-rect.status-heavy { fill: #fef2f2; stroke: #dc2626; stroke-width: 3; }
+
+.svg-badge-text-time { font-family: "Nunito", "Zen Maru Gothic", sans-serif; font-size: 13px; font-weight: 800; text-anchor: middle; dominant-baseline: middle; }
+.svg-badge-text-time.status-normal { fill: #065f46; }
+.svg-badge-text-time.status-crowded { fill: #854d0e; }
+.svg-badge-text-time.status-heavy { fill: #991b1b; }
+
+.svg-badge-delay-pill { rx: 8; ry: 8; }
+.svg-badge-delay-pill.status-crowded { fill: #eab308; }
+.svg-badge-delay-pill.status-heavy { fill: #dc2626; }
+.svg-badge-delay-text { font-family: "Nunito", sans-serif; font-size: 9px; font-weight: 800; fill: #ffffff; text-anchor: middle; dominant-baseline: middle; }
+
+/* 路線名ラベル (SVG内) */
+.svg-road-title { font-size: 13px; font-weight: 900; user-select: none; }
+.svg-road-title.road-r175 { fill: #059669; }
+.svg-road-title.road-higashiharima { fill: #9333ea; }
+.svg-road-title.road-bypass { fill: #dc2626; }
+.svg-road-title.road-meiki { fill: #2563eb; }
+
+/* 区間リスト表示 */
+.road-list { display: grid; gap: 12px; }
+.road-group-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px; }
+.road-group-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.road-group-title { font-size: 14px; font-weight: 900; display: flex; align-items: center; gap: 6px; }
+.road-group-dot { width: 10px; height: 10px; border-radius: 50%; }
+
+.road-item {
+  display: flex; align-items: center; justify-content: space-between; padding: 10px 12px;
+  background: var(--surface-2); border-radius: 12px; margin-bottom: 6px; cursor: pointer;
+  border: 1px solid transparent; transition: all .2s;
+}
+.road-item:hover, .road-item:active { border-color: var(--accent); background: var(--surface); }
+.road-item-left { display: flex; flex-direction: column; gap: 2px; }
+.road-item-name { font-size: 13px; font-weight: 700; color: var(--text); }
+.road-item-sub { font-size: 11px; color: var(--muted); }
+.road-item-right { display: flex; align-items: center; gap: 8px; }
+.road-time-box { text-align: right; }
+.road-time-main { font-family: "Nunito", sans-serif; font-size: 17px; font-weight: 800; }
+.road-time-main.status-normal { color: #059669; }
+.road-time-main.status-crowded { color: #d97706; }
+.road-time-main.status-heavy { color: #dc2626; }
+.road-delay-badge {
+  font-family: "Nunito", sans-serif; font-size: 10px; font-weight: 800; padding: 2px 6px;
+  border-radius: 999px; margin-left: 4px;
+}
+.road-delay-badge.status-crowded { background: var(--advisory-soft); color: #854d0e; }
+.road-delay-badge.status-heavy { background: var(--warning-soft); color: #991b1b; }
+.road-item-arrow { color: var(--muted); font-size: 14px; }
+
+/* 道路区間詳細モーダル */
+.road-sheet-header { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+.road-badge { padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 800; }
+.road-badge.status-normal { background: var(--ok-soft); color: #065f46; }
+.road-badge.status-crowded { background: var(--advisory-soft); color: #854d0e; }
+.road-badge.status-heavy { background: var(--warning-soft); color: #991b1b; }
+.road-sheet-metrics {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 14px;
+  background: var(--surface-2); padding: 12px; border-radius: 14px; text-align: center;
+}
+.metric { display: flex; flex-direction: column; gap: 4px; }
+.metric-label { font-size: 11px; color: var(--muted); font-weight: 500; }
+.metric-val { font-family: "Nunito", "Zen Maru Gothic", sans-serif; font-size: 18px; font-weight: 800; color: var(--text); }
+.btn-primary-action {
+  display: block; text-align: center; padding: 12px 16px; border-radius: 999px;
+  background: #1a73e8; color: #ffffff; font-weight: 700; font-size: 14px; text-decoration: none;
+  margin-top: 14px; box-shadow: 0 4px 12px rgba(26,115,232,.3); transition: opacity .2s;
+}
+.btn-primary-action:hover, .btn-primary-action:active { opacity: .9; }
+

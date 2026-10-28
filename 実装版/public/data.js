@@ -9,6 +9,11 @@ const SHINTETSU_URL =
   (SNAPSHOT_URL.includes("/api/snapshot")
     ? SNAPSHOT_URL.replace("/api/snapshot", "/api/shintetsu")
     : "https://keihou-dashboard.keihou-dashboard-worker.workers.dev/api/shintetsu");
+const TRAFFIC_URL =
+  new URLSearchParams(location.search).get("traffic_src") ||
+  (SNAPSHOT_URL.includes("/api/snapshot")
+    ? SNAPSHOT_URL.replace("/api/snapshot", "/api/traffic")
+    : "data/traffic.sample.json");
 const IS_SAMPLE = SNAPSHOT_URL.includes("sample");
 const STALE_MINUTES = 30; // これより古いスナップショットは「古い可能性」を表示する
 
@@ -158,3 +163,45 @@ function adaptSnapshot(snap) {
     early: adaptProbability(snap),
   };
 }
+
+// 道路路線定義
+const ROAD_LINES = [
+  { id: "r175", name: "国道175号", color: "#10b981", desc: "滝野社IC〜天神町〜田井西〜森友" },
+  { id: "higashiharima", name: "東播磨道", color: "#a855f7", desc: "加古川〜小野" },
+  { id: "bypass", name: "加古川・姫路バイパス", color: "#ef4444", desc: "別所SA〜加古川中央〜明石西" },
+  { id: "meiki", name: "明姫幹線", color: "#3b82f6", desc: "中筋西〜坂井〜谷池〜森友" },
+];
+
+// SVG路線図のトポロジーノード（手書き図の配置関係を忠実に再現）
+const ROAD_MAP_NODES = {
+  takino: { x: 510, y: 40, label: "滝野社IC", align: "right" },
+  tenjin: { x: 530, y: 160, label: "天神町（小野）", align: "right" },
+  tainishi: { x: 550, y: 270, label: "田井西（三木）", align: "right" },
+  moritomo: { x: 570, y: 380, label: "森友（明石・神戸西）", align: "bottom" },
+  bessho: { x: 50, y: 290, label: "別所SA（姫路）", align: "top" },
+  chuo: { x: 290, y: 290, label: "加古川中央", align: "top" },
+  akashinishi: { x: 410, y: 290, label: "明石西", align: "top" },
+  nakasuji: { x: 90, y: 380, label: "中筋西（高砂）", align: "bottom" },
+  sakai: { x: 250, y: 380, label: "坂井（別府）", align: "bottom" },
+  taniike: { x: 410, y: 380, label: "谷池（播磨）", align: "bottom" },
+};
+
+// SVG上の区間リンク設定（各区間の中点・バッジ配置位置）
+const ROAD_MAP_EDGES = {
+  // 国道175号
+  "r175-1": { from: "takino", to: "tenjin", mid: { x: 520, y: 95 }, road: "r175" },
+  "r175-2": { from: "tenjin", to: "tainishi", mid: { x: 540, y: 215 }, road: "r175" },
+  "r175-3": { from: "tainishi", to: "moritomo", mid: { x: 560, y: 325 }, road: "r175" },
+  // 東播磨道
+  "hharima-1": { from: "chuo", to: "tenjin", mid: { x: 410, y: 220 }, road: "higashiharima" },
+  // 加古川・姫路バイパス
+  "bypass-1": { from: "bessho", to: "chuo", mid: { x: 170, y: 290 }, road: "bypass" },
+  "bypass-2": { from: "chuo", to: "akashinishi", mid: { x: 350, y: 290 }, road: "bypass" },
+  // 明姫幹線
+  "meiki-1": { from: "nakasuji", to: "sakai", mid: { x: 170, y: 380 }, road: "meiki" },
+  "meiki-2": { from: "sakai", to: "taniike", mid: { x: 330, y: 380 }, road: "meiki" },
+  "meiki-3": { from: "taniike", to: "moritomo", mid: { x: 490, y: 380 }, road: "meiki" },
+  // 接続線 (別所SA側から中筋西への斜め接続)
+  "conn-nakasuji": { from: "bessho", to: "nakasuji", isConnector: true },
+};
+

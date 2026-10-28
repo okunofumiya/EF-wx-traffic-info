@@ -1,4 +1,4 @@
-/* 気象・交通状況ダッシュボード v0.7.1-dev（気象：スナップショット対応／神鉄運行情報連携／BAND：準備中） */
+/* 気象・交通状況ダッシュボード v0.8.0-dev（気象：スナップショット対応／神鉄運行情報連携／道路交通情報（区間所要時間・路線図マップ対応）） */
 (() => {
   const LV_ORDER = { emergency: 4, danger: 3, warning: 2, advisory: 1 };
   const LV_CLASS = ["none", "advisory", "warning", "danger", "emergency"];
@@ -6,6 +6,9 @@
 
   let model = null; // adaptSnapshot の結果
   let shintetsuStatus = null; // parseShintetsuStatus の結果
+  let trafficData = null; // 道路交通情報
+  let trafficDirection = "south_east"; // "south_east" (南行・東行) | "north_west" (北行・西行)
+  let trafficViewMode = "map"; // "map" | "list"
   let view = localStorage.getItem("view") || "all";
   let activeOnly = localStorage.getItem("activeOnly") === "1";
   let tlArea = null; // 解除見込みで選択中の地域
@@ -53,6 +56,7 @@
     renderHero();
     renderAreas();
     renderTrains();
+    renderRoads();
     renderTimeline();
     renderEarly();
     renderBand();
@@ -81,22 +85,41 @@
     const trainScope = TRAIN_LINES.filter((l) => !mine() || linePins.has(l.id));
     const trainAlertCount = trainScope.filter((l) => getLineStatus(l.id).hasAlert).length;
 
-    let trainNote = "鉄道の運行情報は、各社の公式ページでご確認ください。";
-    if (trainAlertCount > 0) {
-      trainNote = "神戸電鉄で運行情報が出ています。公式ページをご確認ください。";
+    // 道路の遅延区間数をカウント（遅延3分以上）
+    const roadSections = trafficData?.sections || [];
+    const roadDelayed = roadSections.filter((s) => s.delayMin >= 3);
+    const roadDelayCount = roadDelayed.length;
+
+    let trafficNote = "";
+    if (trainAlertCount > 0 && roadDelayCount > 0) {
+      trafficNote = `神戸電鉄で運行情報、道路で${roadDelayCount}区間に遅れが出ています。`;
+    } else if (trainAlertCount > 0) {
+      trafficNote = "神戸電鉄で運行情報が出ています。公式ページをご確認ください。";
+    } else if (roadDelayCount > 0) {
+      const heavy = roadDelayed.filter((s) => s.status === "heavy");
+      if (heavy.length > 0) {
+        trafficNote = `幹線道路（${heavy[0].roadName}など）で渋滞・大幅な遅延（+${heavy[0].delayMin}分）が発生しています。`;
+      } else {
+        trafficNote = `幹線道路で一部混雑（${roadDelayCount}区間で遅れ）が発生しています。時間に余裕をもってお出かけください。`;
+      }
+    } else {
+      trafficNote = "鉄道・主要幹線道路ともに順調です。";
     }
 
-    let level = "ok", icon = "✅", title = "影響なし", text = `現在、対象地域に警報・注意報はなく、神鉄は平常運転です。${trainNote}`;
+    let level = "ok", icon = "✅", title = "影響なし", text = `現在、対象地域に警報・注意報はなく、${trafficNote}`;
     if (warn > 0) {
       level = "alert"; icon = "🌀";
       title = top === "danger" || top === "emergency" ? "厳重警戒" : "通勤に影響あり";
-      text = `${warn}地域に警報が出ています。出勤の可否は早めに所属長へご連絡ください。${trainNote}`;
+      text = `${warn}地域に警報が出ています。出勤の可否は早めに所属長へご連絡ください。${trafficNote}`;
     } else if (adv > 0) {
       level = "caution"; icon = "⚠️"; title = "注意";
-      text = `${adv}地域に注意報が出ています。時間に余裕をもって出発してください。${trainNote}`;
-    } else if (trainAlertCount > 0) {
-      level = "caution"; icon = "🚃"; title = "交通影響あり";
-      text = `神戸電鉄で運行情報（遅延・運休等）が発表されています。時間に余裕をもって出発してください。${trainNote}`;
+      text = `${adv}地域に注意報が出ています。時間に余裕をもって出発してください。${trafficNote}`;
+    } else if (trainAlertCount > 0 || roadDelayCount >= 3) {
+      level = "caution"; icon = "🚗"; title = "交通影響あり";
+      text = `交通機関・幹線道路で混雑や遅延が発生しています。${trafficNote}`;
+    } else if (roadDelayCount > 0) {
+      level = "ok"; icon = "🚗"; title = "一部混雑あり";
+      text = `気象警報はありません。${trafficNote}`;
     }
 
     const hero = $("#hero");
@@ -107,6 +130,7 @@
     countUp($("#stat-warn"), warn);
     countUp($("#stat-adv"), adv);
     countUp($("#stat-train"), trainAlertCount);
+    countUp($("#stat-road"), roadDelayCount);
     document.documentElement.style.setProperty("--orb3", level === "alert" ? "#f43f5e" : level === "caution" ? "#f59e0b" : "#10b981");
   }
 
@@ -231,6 +255,313 @@
       }).join("");
   }
 
+  // 道路交通情報（区間所要時間・路線図マップ）の描画
+  function renderRoads() {
+    const sections = trafficData?.sections || [];
+    const isNorthWest = trafficDirection === "north_west";
+
+    // 方向切替ボタンのアクティブ状態
+    const btnSe = $("#dir-se");
+    const btnNw = $("#dir-nw");
+    if (btnSe && btnNw) {
+      btnSe.classList.toggle("active", !isNorthWest);
+      btnNw.classList.toggle("active", isNorthWest);
+    }
+
+    // 表示モード切替ボタンのアクティブ状態
+    const btnMap = $("#mode-map");
+    const btnList = $("#mode-list");
+    if (btnMap && btnList) {
+      btnMap.classList.toggle("active", trafficViewMode === "map");
+      btnList.classList.toggle("active", trafficViewMode === "list");
+    }
+
+    const mapCard = $("#road-map-card");
+    const listCard = $("#road-list-card");
+    if (mapCard) mapCard.hidden = trafficViewMode !== "map";
+    if (listCard) listCard.hidden = trafficViewMode !== "list";
+
+    // カウント表示
+    const delayedSections = sections.filter((s) => s.delayMin >= 3);
+    const countEl = $("#road-count");
+    if (countEl) {
+      countEl.textContent = `全${sections.length}区間${delayedSections.length > 0 ? `（遅れ${delayedSections.length}件）` : ""}`;
+    }
+
+    const badgeEl = $("#road-source-badge");
+    if (badgeEl) {
+      badgeEl.textContent = trafficData?.isMock
+        ? "※ 基準所要時間表示中（APIキー準備中）"
+        : "※ リアルタイム渋滞情報連動中";
+    }
+
+    if (trafficViewMode === "map") {
+      renderRoadMapSvg(sections, isNorthWest);
+    } else {
+      renderRoadList(sections, isNorthWest);
+    }
+  }
+
+  // SVG路線図のレンダリング
+  function renderRoadMapSvg(sections, isNorthWest) {
+    const svg = $("#road-svg-map");
+    if (!svg) return;
+
+    // 現在の進行方向に応じた区間マッピング
+    const activeSectionMap = isNorthWest
+      ? {
+          "r175-1": "r175-n-3", // 天神町 → 滝野社IC
+          "r175-2": "r175-n-2", // 田井西 → 天神町
+          "r175-3": "r175-n-1", // 森友 → 田井西
+          "hharima-1": "hharima-u-1", // 小野 → 加古川 (上り)
+          "bypass-1": "bypass-w-2", // 加古川中央 → 別所SA
+          "bypass-2": "bypass-w-1", // 明石西 → 加古川中央
+          "meiki-1": "meiki-w-3", // 坂井 → 中筋西
+          "meiki-2": "meiki-w-2", // 谷池 → 坂井
+          "meiki-3": "meiki-w-1", // 森友 → 谷池
+        }
+      : {
+          "r175-1": "r175-s-1", // 滝野社IC → 天神町
+          "r175-2": "r175-s-2", // 天神町 → 田井西
+          "r175-3": "r175-s-3", // 田井西 → 森友
+          "hharima-1": "hharima-d-1", // 加古川 → 小野 (下り)
+          "bypass-1": "bypass-e-1", // 別所SA → 加古川中央
+          "bypass-2": "bypass-e-2", // 加古川中央 → 明石西
+          "meiki-1": "meiki-e-1", // 中筋西 → 坂井
+          "meiki-2": "meiki-e-2", // 坂井 → 谷池
+          "meiki-3": "meiki-e-3", // 谷池 → 森友
+        };
+
+    const secLookup = {};
+    sections.forEach((s) => { secLookup[s.id] = s; });
+
+    let svgHtml = `
+      <defs>
+        <filter id="badge-shadow" x="-20%" y="-20%" width="140%" height="140%">
+          <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="rgba(20,40,40,0.18)" />
+        </filter>
+      </defs>
+    `;
+
+    // 1. 接続線（高砂・別所接続の破線）
+    svgHtml += `<line x1="50" y1="285" x2="90" y2="375" class="svg-edge-path road-connector" />`;
+
+    // 2. 道路ライン（各区間）
+    const edgeCoords = {
+      "r175-1": { x1: 505, y1: 40, x2: 525, y2: 155, road: "r175", sw: 7 },
+      "r175-2": { x1: 525, y1: 155, x2: 550, y2: 265, road: "r175", sw: 7 },
+      "r175-3": { x1: 550, y1: 265, x2: 570, y2: 375, road: "r175", sw: 7 },
+      "hharima-1": { x1: 290, y1: 285, x2: 525, y2: 155, road: "higashiharima", sw: 7 },
+      "bypass-1": { x1: 50, y1: 285, x2: 290, y2: 285, road: "bypass", sw: 8 },
+      "bypass-2": { x1: 290, y1: 285, x2: 410, y2: 285, road: "bypass", sw: 8 },
+      "meiki-1": { x1: 90, y1: 375, x2: 250, y2: 375, road: "meiki", sw: 7 },
+      "meiki-2": { x1: 250, y1: 375, x2: 410, y2: 375, road: "meiki", sw: 7 },
+      "meiki-3": { x1: 410, y1: 375, x2: 570, y2: 375, road: "meiki", sw: 7 },
+    };
+
+    Object.entries(edgeCoords).forEach(([edgeKey, c]) => {
+      const secId = activeSectionMap[edgeKey];
+      const sec = secLookup[secId];
+      const statusCls = sec ? `status-${sec.status}` : "status-normal";
+      svgHtml += `<line x1="${c.x1}" y1="${c.y1}" x2="${c.x2}" y2="${c.y2}" stroke-width="${c.sw}" class="svg-edge-path road-${c.road} ${statusCls}" />`;
+    });
+
+    // 3. 路線名タイトル
+    svgHtml += `
+      <text x="540" y="30" class="svg-road-title road-r175">175号線</text>
+      <text x="350" y="200" class="svg-road-title road-higashiharima">東播磨道</text>
+      <text x="80" y="265" class="svg-road-title road-bypass">加古川・姫路バイパス</text>
+      <text x="280" y="420" class="svg-road-title road-meiki">明姫幹線</text>
+    `;
+
+    // 4. ノード（地点）
+    const nodes = [
+      { id: "takino", x: 505, y: 40, label: "滝野社IC", sub: "加東市", lx: 440, ly: 44, ta: "end" },
+      { id: "tenjin", x: 525, y: 155, label: "天神町", sub: "小野市", lx: 542, ly: 159, ta: "start" },
+      { id: "tainishi", x: 550, y: 265, label: "田井西", sub: "三木市", lx: 567, ly: 269, ta: "start" },
+      { id: "moritomo", x: 570, y: 375, label: "森友", sub: "明石・神戸西", lx: 570, ly: 400, ta: "middle" },
+      { id: "chuo", x: 290, y: 285, label: "加古川中央", sub: "加古川市", lx: 290, ly: 270, ta: "middle" },
+      { id: "bessho", x: 50, y: 285, label: "別所SA", sub: "姫路市", lx: 50, ly: 270, ta: "middle" },
+      { id: "akashinishi", x: 410, y: 285, label: "明石西", sub: "播磨・明石", lx: 410, ly: 270, ta: "middle" },
+      { id: "nakasuji", x: 90, y: 375, label: "中筋西", sub: "高砂市", lx: 90, ly: 400, ta: "middle" },
+      { id: "sakai", x: 250, y: 375, label: "坂井", sub: "別府", lx: 250, ly: 400, ta: "middle" },
+      { id: "taniike", x: 410, y: 375, label: "谷池", sub: "播磨", lx: 410, ly: 400, ta: "middle" },
+    ];
+
+    nodes.forEach((n) => {
+      svgHtml += `
+        <circle cx="${n.x}" cy="${n.y}" r="6" class="svg-node-circle" stroke="#0f172a" />
+        <text x="${n.lx}" y="${n.ly}" text-anchor="${n.ta}" class="svg-node-label">${n.label}</text>
+      `;
+    });
+
+    // 5. 所要時間バッジ（各区間の中央）
+    const badgePositions = {
+      "r175-1": { x: 515, y: 95 },
+      "r175-2": { x: 537, y: 210 },
+      "r175-3": { x: 560, y: 320 },
+      "hharima-1": { x: 405, y: 220 },
+      "bypass-1": { x: 170, y: 285 },
+      "bypass-2": { x: 350, y: 285 },
+      "meiki-1": { x: 170, y: 375 },
+      "meiki-2": { x: 330, y: 375 },
+      "meiki-3": { x: 490, y: 375 },
+    };
+
+    Object.entries(badgePositions).forEach(([edgeKey, pos]) => {
+      const secId = activeSectionMap[edgeKey];
+      const sec = secLookup[secId];
+      if (!sec) return;
+
+      const timeText = `${sec.durationInTrafficMin}分`;
+      const hasDelay = sec.delayMin >= 2;
+      const status = sec.status;
+      const bw = hasDelay ? 68 : 54;
+      const bh = 26;
+      const bx = pos.x - bw / 2;
+      const by = pos.y - bh / 2;
+
+      svgHtml += `
+        <g class="svg-badge-group" data-road-id="${sec.id}" transform-origin="${pos.x} ${pos.y}">
+          <rect x="${bx}" y="${by}" width="${bw}" height="${bh}" class="svg-badge-rect status-${status}" filter="url(#badge-shadow)" />
+          <text x="${hasDelay ? pos.x - 10 : pos.x}" y="${pos.y + 1}" class="svg-badge-text-time status-${status}">${timeText}</text>
+          ${
+            hasDelay
+              ? `
+              <rect x="${bx + bw - 22}" y="${by + 3}" width="18" height="13" class="svg-badge-delay-pill status-${status}" />
+              <text x="${bx + bw - 13}" y="${by + 10.5}" class="svg-badge-delay-text">+${sec.delayMin}</text>
+            `
+              : ""
+          }
+        </g>
+      `;
+    });
+
+    svg.innerHTML = svgHtml;
+
+    // バッジクリックで詳細モーダルを開く
+    svg.querySelectorAll("[data-road-id]").forEach((g) => {
+      g.addEventListener("click", () => {
+        const id = g.dataset.roadId;
+        const sec = secLookup[id];
+        if (sec) openRoadDetail(sec);
+      });
+    });
+  }
+
+  // 区間リストのレンダリング
+  function renderRoadList(sections, isNorthWest) {
+    const listCard = $("#road-list-card");
+    if (!listCard) return;
+
+    // 方向フィルタ
+    const filtered = sections.filter((s) => {
+      if (isNorthWest) return s.direction === "north" || s.direction === "west" || s.direction === "up";
+      return s.direction === "south" || s.direction === "east" || s.direction === "down";
+    });
+
+    // 「情報ありのみ」なら遅延のみ
+    const displayList = activeOnly ? filtered.filter((s) => s.delayMin >= 3) : filtered;
+
+    if (!displayList.length) {
+      listCard.innerHTML = activeOnly
+        ? '<p class="empty card all-clear">✅ 現在、遅延している道路区間はありません（すべて順調）</p>'
+        : '<p class="empty card">区間データがありません</p>';
+      return;
+    }
+
+    // 路線ごとにグループ化
+    const grouped = {};
+    displayList.forEach((s) => {
+      if (!grouped[s.road]) grouped[s.road] = [];
+      grouped[s.road].push(s);
+    });
+
+    let html = "";
+    ROAD_LINES.forEach((rl) => {
+      const items = grouped[rl.id];
+      if (!items || !items.length) return;
+
+      html += `
+        <div class="road-group-card">
+          <div class="road-group-header">
+            <h3 class="road-group-title">
+              <span class="road-group-dot" style="background:${rl.color}"></span>
+              ${rl.name}
+            </h3>
+            <span class="note">${rl.desc}</span>
+          </div>
+          <div class="road-items">
+            ${items
+              .map((s) => {
+                const statusBadge =
+                  s.status === "heavy"
+                    ? '<span class="road-delay-badge status-heavy">渋滞</span>'
+                    : s.status === "crowded"
+                    ? `<span class="road-delay-badge status-crowded">+${s.delayMin}分遅れ</span>`
+                    : "";
+                return `
+                <div class="road-item" data-road-id="${s.id}">
+                  <div class="road-item-left">
+                    <span class="road-item-name">${esc(s.name)}</span>
+                    <span class="road-item-sub">約 ${s.distanceKm} km・通常 ${s.durationMin}分</span>
+                  </div>
+                  <div class="road-item-right">
+                    <div class="road-time-box">
+                      <span class="road-time-main status-${s.status}">${s.durationInTrafficMin}分</span>
+                      ${statusBadge}
+                    </div>
+                    <span class="road-item-arrow">›</span>
+                  </div>
+                </div>`;
+              })
+              .join("")}
+          </div>
+        </div>
+      `;
+    });
+
+    listCard.innerHTML = html;
+
+    listCard.querySelectorAll("[data-road-id]").forEach((el) => {
+      el.addEventListener("click", () => {
+        const id = el.dataset.roadId;
+        const sec = sections.find((s) => s.id === id);
+        if (sec) openRoadDetail(sec);
+      });
+    });
+  }
+
+  // 道路区間詳細モーダルを開く
+  function openRoadDetail(sec) {
+    const sheet = $("#road-sheet");
+    if (!sheet) return;
+
+    const badge = $("#road-sheet-badge");
+    badge.className = `road-badge status-${sec.status}`;
+    badge.textContent = sec.status === "heavy" ? "🔴 渋滞" : sec.status === "crowded" ? "🟡 混雑" : "🟢 順調";
+
+    $("#road-sheet-title").textContent = `【${sec.roadName}】${sec.name}`;
+    $("#road-sheet-curr").textContent = `${sec.durationInTrafficMin} 分`;
+    $("#road-sheet-base").textContent = `${sec.durationMin} 分`;
+    $("#road-sheet-delay").textContent = sec.delayMin > 0 ? `+${sec.delayMin} 分` : "なし";
+
+    let desc = `区間距離：約 ${sec.distanceKm} km (${sec.directionLabel})`;
+    if (sec.delayMin >= 8) {
+      desc += "。現在、大幅な渋滞が発生しています。別ルートの検討や出発時間の調整をおすすめします。";
+    } else if (sec.delayMin >= 3) {
+      desc += "。通常よりやや混雑しています。余裕をもってお出かけください。";
+    } else {
+      desc += "。目立った混雑はなく、通常通りスムーズに走行できます。";
+    }
+    $("#road-sheet-desc").textContent = desc;
+
+    const mapLink = $("#road-sheet-maplink");
+    mapLink.href = sec.mapUrl;
+
+    sheet.hidden = false;
+  }
+
   // 解除見込みに出す地域の候補（現在の警報＋これからの見通しの危険度が高い順）
   //  マイ表示：★の地域　／　全体表示：警報や見通しのある地域（危険度順）
   function timelineCandidates() {
@@ -317,12 +648,13 @@
     toast._t = setTimeout(() => t.classList.remove("show"), 1800);
   }
 
-  // スナップショットおよび神鉄データの読み込み
+  // スナップショット、神鉄データ、道路交通データの読み込み
   async function load({ manual = false } = {}) {
     try {
-      const [snapRes, shinRes] = await Promise.allSettled([
+      const [snapRes, shinRes, trafficRes] = await Promise.allSettled([
         fetch(SNAPSHOT_URL, { cache: "no-store" }),
         fetch(SHINTETSU_URL, { cache: "no-store" }),
+        fetch(TRAFFIC_URL, { cache: "no-store" }),
       ]);
 
       if (snapRes.status === "fulfilled" && snapRes.value.ok) {
@@ -343,6 +675,17 @@
         }
       } else {
         shintetsuStatus = parseShintetsuStatus(null);
+      }
+
+      if (trafficRes.status === "fulfilled" && trafficRes.value.ok) {
+        try {
+          trafficData = await trafficRes.value.json();
+        } catch (e) {
+          console.warn("道路交通データの解析エラー:", e);
+          trafficData = null;
+        }
+      } else {
+        trafficData = null;
       }
 
       render();
@@ -399,6 +742,35 @@
     localStorage.setItem("linePins", JSON.stringify([...linePins]));
     toast(linePins.has(id) ? `★ ${name} をマイ設定に追加しました` : `${name} をマイ設定から外しました`);
     renderTrains();
+  });
+
+  // 道路：進行方向切替
+  $("#dir-se")?.addEventListener("click", () => {
+    trafficDirection = "south_east";
+    renderRoads();
+  });
+  $("#dir-nw")?.addEventListener("click", () => {
+    trafficDirection = "north_west";
+    renderRoads();
+  });
+
+  // 道路：表示形式切替（路線図マップ / リスト）
+  $("#mode-map")?.addEventListener("click", () => {
+    trafficViewMode = "map";
+    renderRoads();
+  });
+  $("#mode-list")?.addEventListener("click", () => {
+    trafficViewMode = "list";
+    renderRoads();
+  });
+
+  // 道路詳細モーダルの閉じる
+  $("#road-sheet-close")?.addEventListener("click", () => {
+    const sheet = $("#road-sheet");
+    if (sheet) sheet.hidden = true;
+  });
+  $("#road-sheet")?.addEventListener("click", (e) => {
+    if (e.target.id === "road-sheet") e.currentTarget.hidden = true;
   });
 
   // 説明シート
