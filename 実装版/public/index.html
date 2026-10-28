@@ -49,133 +49,194 @@
       <button id="load-retry" class="sheet-close">再読み込み</button>
     </div>
 
-    <!-- 総合ステータス -->
-    <section id="summary" class="section">
-      <div id="hero" class="hero card">
-        <div class="hero-level">
-          <span id="hero-icon" class="hero-icon"></span>
-          <div>
-            <p class="hero-label">現在の気象・交通状況</p>
-            <h2 id="hero-title">--</h2>
+    <!-- 0. 概要ページ -->
+    <div id="page-summary" class="app-page active">
+      <!-- 総合ステータス -->
+      <section id="summary" class="section">
+        <div id="hero" class="hero card">
+          <div class="hero-level">
+            <span id="hero-icon" class="hero-icon"></span>
+            <div>
+              <p class="hero-label">現在の気象・交通状況</p>
+              <h2 id="hero-title">--</h2>
+            </div>
+          </div>
+          <p id="hero-text" class="hero-text"></p>
+          <div class="hero-stats">
+            <div class="stat"><span id="stat-warn" class="stat-num">0</span><span class="stat-cap">警報の地域</span></div>
+            <div class="stat"><span id="stat-adv" class="stat-num">0</span><span class="stat-cap">注意報の地域</span></div>
+            <div class="stat"><span id="stat-train" class="stat-num">0</span><span class="stat-cap">運行に影響</span></div>
+            <div class="stat"><span id="stat-road" class="stat-num">0</span><span class="stat-cap">道路の遅延</span></div>
           </div>
         </div>
-        <p id="hero-text" class="hero-text"></p>
-        <div class="hero-stats">
-          <div class="stat"><span id="stat-warn" class="stat-num">0</span><span class="stat-cap">警報の地域</span></div>
-          <div class="stat"><span id="stat-adv" class="stat-num">0</span><span class="stat-cap">注意報の地域</span></div>
-          <div class="stat"><span id="stat-train" class="stat-num">0</span><span class="stat-cap">運行に影響</span></div>
-          <div class="stat"><span id="stat-road" class="stat-num">0</span><span class="stat-cap">道路の遅延</span></div>
+      </section>
+
+      <!-- 概要クイックナビカード -->
+      <section class="section">
+        <div class="summary-cards">
+          <div class="summary-card card" data-go-page="weather">
+            <div class="sc-header">
+              <span class="sc-icon">☁️</span>
+              <div class="sc-title-wrap">
+                <h3>気象情報</h3>
+                <span id="sc-weather-badge" class="sc-badge">確認中</span>
+              </div>
+            </div>
+            <p id="sc-weather-desc" class="sc-desc">警報・注意報の発表状況と今後の解除見込み</p>
+            <div class="sc-footer"><span>詳細を見る ›</span></div>
+          </div>
+
+          <div class="summary-card card" data-go-page="trains">
+            <div class="sc-header">
+              <span class="sc-icon">🚃</span>
+              <div class="sc-title-wrap">
+                <h3>電車の運行状況</h3>
+                <span id="sc-train-badge" class="sc-badge">平常運転</span>
+              </div>
+            </div>
+            <p id="sc-train-desc" class="sc-desc">神戸電鉄（全線）・JR神戸線・加古川線・山陽電車</p>
+            <div class="sc-footer"><span>運行情報を見る ›</span></div>
+          </div>
+
+          <div class="summary-card card" data-go-page="roads">
+            <div class="sc-header">
+              <span class="sc-icon">🚗</span>
+              <div class="sc-title-wrap">
+                <h3>道路情報（所要時間）</h3>
+                <span id="sc-road-badge" class="sc-badge">順調</span>
+              </div>
+            </div>
+            <p id="sc-road-desc" class="sc-desc">国道175号・東播磨道・加古川姫路バイパス・明姫幹線</p>
+            <div class="sc-footer"><span>路線図・所要時間を見る ›</span></div>
+          </div>
         </div>
-      </div>
-    </section>
+      </section>
 
-    <!-- 警報 -->
-    <section id="warnings" class="section">
-      <div class="section-head">
-        <h2>居住地の警報・注意報</h2>
-        <span id="area-count" class="count-pill"></span>
-      </div>
-      <div class="legend">
-        <span class="lg lg-emergency">特別警報</span>
-        <span class="lg lg-danger">危険警報</span>
-        <span class="lg lg-warning">警報</span>
-        <span class="lg lg-advisory">注意報</span>
-      </div>
-      <div id="area-groups"></div>
-    </section>
+      <!-- BAND -->
+      <section id="band" class="section">
+        <div class="section-head"><h2>BAND 投稿履歴（プレビュー）</h2></div>
+        <div id="band-list" class="band-list"></div>
+      </section>
+    </div>
 
-    <!-- 運行情報 -->
-    <section id="trains" class="section">
-      <div class="section-head"><h2>鉄道運行情報</h2><span id="train-count" class="count-pill"></span></div>
-      <div id="train-list" class="train-list"></div>
-    </section>
-
-    <!-- 道路交通情報 -->
-    <section id="roads" class="section">
-      <div class="section-head">
-        <h2>道路交通情報（区間所要時間）</h2>
-        <span id="road-count" class="count-pill"></span>
-      </div>
-
-      <!-- 操作バー：方向切り替え＆表示形式（マップ / リスト）切り替え -->
-      <div class="road-controls">
-        <div class="road-dir-switch" role="tablist" aria-label="進行方向">
-          <button class="road-dir-btn active" data-dir="both" id="dir-both">
-            <span>🔄</span> 両方向
-          </button>
-          <button class="road-dir-btn" data-dir="south_east" id="dir-se">
-            <span>▼</span> 南行・東行<small>（明石方面）</small>
-          </button>
-          <button class="road-dir-btn" data-dir="north_west" id="dir-nw">
-            <span>▲</span> 北行・西行<small>（社・姫路方面）</small>
-          </button>
+    <!-- 1. 気象情報と見込みページ -->
+    <div id="page-weather" class="app-page" hidden>
+      <!-- 警報 -->
+      <section id="warnings" class="section">
+        <div class="section-head">
+          <h2>居住地の警報・注意報</h2>
+          <span id="area-count" class="count-pill"></span>
         </div>
-        <div class="road-view-switch" role="tablist" aria-label="表示形式">
-          <button class="road-vbtn active" data-mode="map" id="mode-map">🗺 路線図</button>
-          <button class="road-vbtn" data-mode="list" id="mode-list">📋 リスト</button>
+        <div class="legend">
+          <span class="lg lg-emergency">特別警報</span>
+          <span class="lg lg-danger">危険警報</span>
+          <span class="lg lg-warning">警報</span>
+          <span class="lg lg-advisory">注意報</span>
         </div>
-      </div>
+        <div id="area-groups"></div>
+      </section>
 
-      <!-- 凡例 -->
-      <div class="legend road-legend">
-        <span class="lg-road lg-road-normal">🟢 順調</span>
-        <span class="lg-road lg-road-crowded">🟡 混雑（+3分〜）</span>
-        <span class="lg-road lg-road-heavy">🔴 渋滞（+8分〜）</span>
-        <span class="note road-source-note" id="road-source-badge"></span>
-      </div>
+      <!-- 今後の見込み -->
+      <section id="outlook" class="section">
+        <div class="section-head"><h2>今後の見込み</h2></div>
 
-      <!-- 路線図マップコンテナ (SVG) -->
-      <div id="road-map-card" class="card road-map-card">
-        <div class="road-map-wrapper">
-          <svg id="road-svg-map" viewBox="0 0 660 470" preserveAspectRatio="xMidYMid meet" aria-label="道路路線図"></svg>
+        <div class="card">
+          <h3 class="card-title">警報の解除見込み</h3>
+          <div id="tl-tabs" class="tl-tabs" role="tablist" aria-label="地域を選択"></div>
+          <div id="timeline" class="timeline-wrap"></div>
+          <p id="tl-note" class="note"></p>
         </div>
-        <p class="note map-hint">※ 区間をタップするとGoogleマップのルート案内や詳細が開きます</p>
-      </div>
 
-      <!-- 区間一覧リスト -->
-      <div id="road-list-card" class="road-list" hidden></div>
-    </section>
+        <div class="card">
+          <h3 class="card-title">5日先までの警報級の可能性（兵庫県南部）</h3>
+          <div id="early-grid" class="early-grid"></div>
+          <p id="early-text" class="note"></p>
+          <p class="note">［高］警報級になる可能性が高い ／［中］可能性がある</p>
+        </div>
+      </section>
+    </div>
 
-    <!-- 今後の見込み -->
-    <section id="outlook" class="section">
-      <div class="section-head"><h2>今後の見込み</h2></div>
+    <!-- 2. 電車の運行状況ページ -->
+    <div id="page-trains" class="app-page" hidden>
+      <section id="trains" class="section">
+        <div class="section-head"><h2>鉄道運行情報</h2><span id="train-count" class="count-pill"></span></div>
+        <div id="train-list" class="train-list"></div>
+      </section>
+    </div>
 
-      <div class="card">
-        <h3 class="card-title">警報の解除見込み</h3>
-        <div id="tl-tabs" class="tl-tabs" role="tablist" aria-label="地域を選択"></div>
-        <div id="timeline" class="timeline-wrap"></div>
-        <p id="tl-note" class="note"></p>
-      </div>
+    <!-- 3. 道路情報ページ -->
+    <div id="page-roads" class="app-page" hidden>
+      <section id="roads" class="section">
+        <div class="section-head">
+          <h2>道路交通情報（区間所要時間）</h2>
+          <span id="road-count" class="count-pill"></span>
+        </div>
 
-      <div class="card">
-        <h3 class="card-title">5日先までの警報級の可能性（兵庫県南部）</h3>
-        <div id="early-grid" class="early-grid"></div>
-        <p id="early-text" class="note"></p>
-        <p class="note">［高］警報級になる可能性が高い ／［中］可能性がある</p>
-      </div>
-    </section>
+        <!-- 操作バー：方向切り替え＆表示形式（マップ / リスト）切り替え -->
+        <div class="road-controls">
+          <div class="road-dir-switch" role="tablist" aria-label="進行方向">
+            <button class="road-dir-btn active" data-dir="both" id="dir-both">
+              <span>🔄</span> 両方向
+            </button>
+            <button class="road-dir-btn" data-dir="south_east" id="dir-se">
+              <span>▼</span> 南行・東行<small>（明石方面）</small>
+            </button>
+            <button class="road-dir-btn" data-dir="north_west" id="dir-nw">
+              <span>▲</span> 北行・西行<small>（社・姫路方面）</small>
+            </button>
+          </div>
+          <div class="road-view-switch" role="tablist" aria-label="表示形式">
+            <button class="road-vbtn active" data-mode="map" id="mode-map">🗺 路線図</button>
+            <button class="road-vbtn" data-mode="list" id="mode-list">📋 リスト</button>
+          </div>
+        </div>
 
-    <!-- BAND -->
-    <section id="band" class="section">
-      <div class="section-head"><h2>BAND 投稿履歴（プレビュー）</h2></div>
-      <div id="band-list" class="band-list"></div>
-    </section>
+        <!-- 凡例 -->
+        <div class="legend road-legend">
+          <span class="lg-road lg-road-normal">🟢 順調</span>
+          <span class="lg-road lg-road-crowded">🟡 混雑（+3分〜）</span>
+          <span class="lg-road lg-road-heavy">🔴 渋滞（+8分〜）</span>
+          <span class="note road-source-note" id="road-source-badge"></span>
+        </div>
+
+        <!-- 路線図マップコンテナ (SVG) -->
+        <div id="road-map-card" class="card road-map-card">
+          <div class="road-map-wrapper">
+            <svg id="road-svg-map" viewBox="0 0 660 620" preserveAspectRatio="xMidYMid meet" aria-label="道路路線図"></svg>
+          </div>
+          <p class="note map-hint">※ 区間をタップするとGoogleマップのルート案内や詳細が開きます</p>
+        </div>
+
+        <!-- 区間一覧リスト -->
+        <div id="road-list-card" class="road-list" hidden></div>
+      </section>
+    </div>
 
     <footer class="app-footer">
       <p>気象情報：気象庁の公開データをもとに作成しています。</p>
       <p>詳しい天気は各市町の「天気」リンク（Yahoo!天気）から確認できます。</p>
       <p>交通情報：神戸電鉄の運行有無、主要幹線道路の区間所要時間に対応しています。</p>
-      <p class="ver">v0.8.1-dev</p>
+      <p class="ver">v0.9.1-dev</p>
     </footer>
   </main>
 
-  <nav class="bottom-nav" aria-label="セクション移動">
-    <a href="#summary" class="nav-item active" id="nav-summary"><svg viewBox="0 0 24 24"><path d="M4 13h7V4H4v9Zm0 7h7v-5H4v5Zm9 0h7v-9h-7v9Zm0-16v5h7V4h-7Z"/></svg><span>概要</span></a>
-    <a href="#warnings" class="nav-item" id="nav-warnings"><svg viewBox="0 0 24 24"><path d="M1 21h22L12 2 1 21Zm12-3h-2v-2h2v2Zm0-4h-2v-4h2v4Z"/></svg><span>警報</span></a>
-    <a href="#trains" class="nav-item" id="nav-trains"><svg viewBox="0 0 24 24"><path d="M12 2c-4 0-8 .5-8 4v9.5A3.5 3.5 0 0 0 7.5 19L6 20.5v.5h12v-.5L16.5 19a3.5 3.5 0 0 0 3.5-3.5V6c0-3.5-4-4-8-4ZM7.5 17a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3ZM11 10H6V6h5v4Zm2 0V6h5v4h-5Zm3.5 7a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3Z"/></svg><span>運行</span></a>
-    <a href="#roads" class="nav-item" id="nav-roads"><svg viewBox="0 0 24 24"><path d="M18.92 6.01C18.72 5.42 18.16 5 17.5 5h-11c-.66 0-1.22.42-1.42 1.01L3 12v8c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-1h12v1c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-8l-2.08-5.99zM6.5 16c-.83 0-1.5-.67-1.5-1.5S5.67 13 6.5 13s1.5.67 1.5 1.5S7.33 16 6.5 16zm11 0c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zM5 11l1.5-4.5h11L19 11H5z"/></svg><span>道路</span></a>
-    <a href="#outlook" class="nav-item" id="nav-outlook"><svg viewBox="0 0 24 24"><path d="M19 3h-1V1h-2v2H8V1H6v2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2Zm0 16H5V8h14v11Z"/></svg><span>見込み</span></a>
-    <a href="#band" class="nav-item" id="nav-band"><svg viewBox="0 0 24 24"><path d="M20 2H4a2 2 0 0 0-2 2v18l4-4h14a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2Z"/></svg><span>BAND</span></a>
+  <nav class="bottom-nav" aria-label="ページ切り替え">
+    <button class="nav-item active" data-page="summary" id="nav-summary">
+      <svg viewBox="0 0 24 24"><path d="M4 13h7V4H4v9Zm0 7h7v-5H4v5Zm9 0h7v-9h-7v9Zm0-16v5h7V4h-7Z"/></svg>
+      <span>概要</span>
+    </button>
+    <button class="nav-item" data-page="weather" id="nav-weather">
+      <svg viewBox="0 0 24 24"><path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96z"/></svg>
+      <span>気象情報</span>
+    </button>
+    <button class="nav-item" data-page="trains" id="nav-trains">
+      <svg viewBox="0 0 24 24"><path d="M12 2c-4 0-8 .5-8 4v9.5A3.5 3.5 0 0 0 7.5 19L6 20.5v.5h12v-.5L16.5 19a3.5 3.5 0 0 0 3.5-3.5V6c0-3.5-4-4-8-4ZM7.5 17a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3ZM11 10H6V6h5v4Zm2 0V6h5v4h-5Zm3.5 7a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3Z"/></svg>
+      <span>電車運行</span>
+    </button>
+    <button class="nav-item" data-page="roads" id="nav-roads">
+      <svg viewBox="0 0 24 24"><path d="M18.92 6.01C18.72 5.42 18.16 5 17.5 5h-11c-.66 0-1.22.42-1.42 1.01L3 12v8c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-1h12v1c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-8l-2.08-5.99zM6.5 16c-.83 0-1.5-.67-1.5-1.5S5.67 13 6.5 13s1.5.67 1.5 1.5S7.33 16 6.5 16zm11 0c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zM5 11l1.5-4.5h11L19 11H5z"/></svg>
+      <span>道路情報</span>
+    </button>
   </nav>
 
   <div id="toast" class="toast" role="status"></div>

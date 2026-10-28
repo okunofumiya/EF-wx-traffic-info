@@ -1,9 +1,10 @@
-/* 気象・交通状況ダッシュボード v0.8.1-dev（気象：スナップショット対応／神鉄運行情報連携／道路交通情報（両方向表示・路線図マップ対応）） */
+/* 気象・交通状況ダッシュボード v0.9.1-dev（4ページタブ切替対応／気象：スナップショット対応／神鉄運行情報連携／道路交通情報対応） */
 (() => {
   const LV_ORDER = { emergency: 4, danger: 3, warning: 2, advisory: 1 };
   const LV_CLASS = ["none", "advisory", "warning", "danger", "emergency"];
   const $ = (s) => document.querySelector(s);
 
+  let activePage = "summary"; // "summary" | "weather" | "trains" | "roads"
   let model = null; // adaptSnapshot の結果
   let shintetsuStatus = null; // parseShintetsuStatus の結果
   let trafficData = null; // 道路交通情報
@@ -132,6 +133,97 @@
     countUp($("#stat-train"), trainAlertCount);
     countUp($("#stat-road"), roadDelayCount);
     document.documentElement.style.setProperty("--orb3", level === "alert" ? "#f43f5e" : level === "caution" ? "#f59e0b" : "#10b981");
+
+    renderSummaryCards(warn, adv, trainAlertCount, roadDelayCount, roadDelayed);
+  }
+
+  // 概要ページの各サマリーカードのバッジ・テキスト更新
+  function renderSummaryCards(warn, adv, trainAlertCount, roadDelayCount, roadDelayed) {
+    // 1. 気象サマリー
+    const wBadge = $("#sc-weather-badge");
+    const wDesc = $("#sc-weather-desc");
+    if (wBadge && wDesc) {
+      if (warn > 0) {
+        wBadge.className = "sc-badge status-alert";
+        wBadge.textContent = `警報 ${warn}地域`;
+        wDesc.textContent = `対象地域に警報が発表されています。解除見込みと今後の推移を確認してください。`;
+      } else if (adv > 0) {
+        wBadge.className = "sc-badge status-caution";
+        wBadge.textContent = `注意報 ${adv}地域`;
+        wDesc.textContent = `注意報が発表されています。見込み・注意期間をご確認ください。`;
+      } else {
+        wBadge.className = "sc-badge status-ok";
+        wBadge.textContent = "発表なし";
+        wDesc.textContent = "現在、対象地域に発表中の気象警報・注意報はありません。";
+      }
+    }
+
+    // 2. 電車サマリー
+    const tBadge = $("#sc-train-badge");
+    const tDesc = $("#sc-train-desc");
+    if (tBadge && tDesc) {
+      if (trainAlertCount > 0) {
+        tBadge.className = "sc-badge status-alert";
+        tBadge.textContent = "運行情報あり";
+        tDesc.textContent = "神戸電鉄で運転見合わせまたは遅れが発生しています。公式情報をご確認ください。";
+      } else {
+        tBadge.className = "sc-badge status-ok";
+        tBadge.textContent = "平常運転";
+        tDesc.textContent = "神戸電鉄は平常通り運行しています（JR・山陽等は各社公式リンク参照）。";
+      }
+    }
+
+    // 3. 道路サマリー
+    const rBadge = $("#sc-road-badge");
+    const rDesc = $("#sc-road-desc");
+    if (rBadge && rDesc) {
+      if (roadDelayCount > 0) {
+        const heavyCount = roadDelayed.filter((s) => s.status === "heavy").length;
+        if (heavyCount > 0) {
+          rBadge.className = "sc-badge status-alert";
+          rBadge.textContent = `渋滞 ${heavyCount}件`;
+          rDesc.textContent = `主要幹線道路（加古川バイパス等）で渋滞が発生しています。路線図をご確認ください。`;
+        } else {
+          rBadge.className = "sc-badge status-caution";
+          rBadge.textContent = `遅れ ${roadDelayCount}区間`;
+          rDesc.textContent = `幹線道路で一部混雑が発生しています。路線図・所要時間をご確認ください。`;
+        }
+      } else {
+        rBadge.className = "sc-badge status-ok";
+        rBadge.textContent = "順調";
+        rDesc.textContent = "主要幹線道路（175号・東播磨道・バイパス・明姫幹線）は通常通り順調です。";
+      }
+    }
+  }
+
+  // ページ切り替え（０．概要 / １．気象情報と見込み / ２．電車の運行状況 / ３．道路情報）
+  function switchPage(pageId) {
+    const validPages = ["summary", "weather", "trains", "roads"];
+    if (!validPages.includes(pageId)) pageId = "summary";
+    activePage = pageId;
+
+    // 各ページコンテナの表示・非表示切替
+    validPages.forEach((p) => {
+      const el = $(`#page-${p}`);
+      if (el) {
+        const isActive = p === pageId;
+        el.classList.toggle("active", isActive);
+        el.hidden = !isActive;
+      }
+    });
+
+    // 下部ナビゲーションボタンのアクティブ状態
+    document.querySelectorAll(".bottom-nav .nav-item").forEach((btn) => {
+      btn.classList.toggle("active", btn.dataset.page === pageId);
+    });
+
+    // 最上部へスクロール
+    window.scrollTo({ top: 0, behavior: "instant" });
+
+    // 道路情報ページに切り替わった場合、マップが非表示からの復帰で再描画が必要なら反映
+    if (pageId === "roads") {
+      renderRoads();
+    }
   }
 
   function countUp(el, to) {
@@ -320,7 +412,7 @@
     `;
 
     // 1. 接続線（高砂・別所接続の破線）
-    svgHtml += `<line x1="50" y1="290" x2="90" y2="390" class="svg-edge-path road-connector" />`;
+    svgHtml += `<line x1="50" y1="380" x2="90" y2="520" class="svg-edge-path road-connector" />`;
 
     // 2. 道路ライン（各区間）
     // 各ラインに属する区間の最大遅延ステータスを求めてハイライト
@@ -332,15 +424,15 @@
     };
 
     const edgeDefs = [
-      { id: "r175-1", x1: 505, y1: 45, x2: 525, y2: 160, road: "r175", sw: 7, secs: ["r175-s-1", "r175-n-3"] },
-      { id: "r175-2", x1: 525, y1: 160, x2: 550, y2: 275, road: "r175", sw: 7, secs: ["r175-s-2", "r175-n-2"] },
-      { id: "r175-3", x1: 550, y1: 275, x2: 570, y2: 390, road: "r175", sw: 7, secs: ["r175-s-3", "r175-n-1"] },
-      { id: "hharima-1", x1: 290, y1: 290, x2: 525, y2: 160, road: "higashiharima", sw: 7, secs: ["hharima-d-1", "hharima-u-1"] },
-      { id: "bypass-1", x1: 50, y1: 290, x2: 290, y2: 290, road: "bypass", sw: 8, secs: ["bypass-e-1", "bypass-w-2"] },
-      { id: "bypass-2", x1: 290, y1: 290, x2: 410, y2: 290, road: "bypass", sw: 8, secs: ["bypass-e-2", "bypass-w-1"] },
-      { id: "meiki-1", x1: 90, y1: 390, x2: 250, y2: 390, road: "meiki", sw: 7, secs: ["meiki-e-1", "meiki-w-3"] },
-      { id: "meiki-2", x1: 250, y1: 390, x2: 410, y2: 390, road: "meiki", sw: 7, secs: ["meiki-e-2", "meiki-w-2"] },
-      { id: "meiki-3", x1: 410, y1: 390, x2: 570, y2: 390, road: "meiki", sw: 7, secs: ["meiki-e-3", "meiki-w-1"] },
+      { id: "r175-1", x1: 505, y1: 45, x2: 525, y2: 200, road: "r175", sw: 7, secs: ["r175-s-1", "r175-n-3"] },
+      { id: "r175-2", x1: 525, y1: 200, x2: 550, y2: 360, road: "r175", sw: 7, secs: ["r175-s-2", "r175-n-2"] },
+      { id: "r175-3", x1: 550, y1: 360, x2: 570, y2: 520, road: "r175", sw: 7, secs: ["r175-s-3", "r175-n-1"] },
+      { id: "hharima-1", x1: 290, y1: 380, x2: 525, y2: 200, road: "higashiharima", sw: 7, secs: ["hharima-d-1", "hharima-u-1"] },
+      { id: "bypass-1", x1: 50, y1: 380, x2: 290, y2: 380, road: "bypass", sw: 8, secs: ["bypass-e-1", "bypass-w-2"] },
+      { id: "bypass-2", x1: 290, y1: 380, x2: 410, y2: 380, road: "bypass", sw: 8, secs: ["bypass-e-2", "bypass-w-1"] },
+      { id: "meiki-1", x1: 90, y1: 520, x2: 250, y2: 520, road: "meiki", sw: 7, secs: ["meiki-e-1", "meiki-w-3"] },
+      { id: "meiki-2", x1: 250, y1: 520, x2: 410, y2: 520, road: "meiki", sw: 7, secs: ["meiki-e-2", "meiki-w-2"] },
+      { id: "meiki-3", x1: 410, y1: 520, x2: 570, y2: 520, road: "meiki", sw: 7, secs: ["meiki-e-3", "meiki-w-1"] },
     ];
 
     edgeDefs.forEach((e) => {
@@ -350,24 +442,24 @@
 
     // 3. 路線名タイトル
     svgHtml += `
-      <text x="535" y="30" class="svg-road-title road-r175">175号線</text>
-      <text x="330" y="210" class="svg-road-title road-higashiharima">東播磨道</text>
-      <text x="80" y="240" class="svg-road-title road-bypass">加古川・姫路バイパス</text>
-      <text x="280" y="455" class="svg-road-title road-meiki">明姫幹線</text>
+      <text x="535" y="28" class="svg-road-title road-r175">175号線</text>
+      <text x="325" y="285" class="svg-road-title road-higashiharima">東播磨道</text>
+      <text x="75" y="325" class="svg-road-title road-bypass">加古川・姫路バイパス</text>
+      <text x="280" y="590" class="svg-road-title road-meiki">明姫幹線</text>
     `;
 
     // 4. ノード（地点）
     const nodes = [
       { id: "takino", x: 505, y: 45, label: "滝野社IC", sub: "加東市", lx: 440, ly: 49, ta: "end" },
-      { id: "tenjin", x: 525, y: 160, label: "天神町", sub: "小野市", lx: 535, ly: 155, ta: "start" },
-      { id: "tainishi", x: 550, y: 275, label: "田井西", sub: "三木市", lx: 560, ly: 270, ta: "start" },
-      { id: "moritomo", x: 570, y: 390, label: "森友", sub: "明石・神戸西", lx: 570, ly: 455, ta: "middle" },
-      { id: "chuo", x: 290, y: 290, label: "加古川中央", sub: "加古川市", lx: 290, ly: 240, ta: "middle" },
-      { id: "bessho", x: 50, y: 290, label: "別所SA", sub: "姫路市", lx: 50, ly: 240, ta: "middle" },
-      { id: "akashinishi", x: 410, y: 290, label: "明石西", sub: "播磨・明石", lx: 410, ly: 240, ta: "middle" },
-      { id: "nakasuji", x: 90, y: 390, label: "中筋西", sub: "高砂市", lx: 90, ly: 455, ta: "middle" },
-      { id: "sakai", x: 250, y: 390, label: "坂井", sub: "別府", lx: 250, ly: 455, ta: "middle" },
-      { id: "taniike", x: 410, y: 390, label: "谷池", sub: "播磨", lx: 410, ly: 455, ta: "middle" },
+      { id: "tenjin", x: 525, y: 200, label: "天神町", sub: "小野市", lx: 538, ly: 195, ta: "start" },
+      { id: "tainishi", x: 550, y: 360, label: "田井西", sub: "三木市", lx: 563, ly: 355, ta: "start" },
+      { id: "moritomo", x: 570, y: 520, label: "森友", sub: "明石・神戸西", lx: 570, ly: 590, ta: "middle" },
+      { id: "chuo", x: 290, y: 380, label: "加古川中央", sub: "加古川市", lx: 290, ly: 325, ta: "middle" },
+      { id: "bessho", x: 50, y: 380, label: "別所SA", sub: "姫路市", lx: 50, ly: 325, ta: "middle" },
+      { id: "akashinishi", x: 410, y: 380, label: "明石西", sub: "播磨・明石", lx: 410, ly: 325, ta: "middle" },
+      { id: "nakasuji", x: 90, y: 520, label: "中筋西", sub: "高砂市", lx: 90, ly: 590, ta: "middle" },
+      { id: "sakai", x: 250, y: 520, label: "坂井", sub: "別府", lx: 250, ly: 590, ta: "middle" },
+      { id: "taniike", x: 410, y: 520, label: "谷池", sub: "播磨", lx: 410, ly: 590, ta: "middle" },
     ];
 
     nodes.forEach((n) => {
@@ -380,30 +472,30 @@
     // 5. 所要時間バッジ（全18区間・両方向レイアウト）
     const SECTION_LAYOUT = {
       // 175号線 (南行: 線の左側 / 北行: 線の右側)
-      "r175-s-1": { x: 468, y: 100, dir: "south_east", arrow: "▼", tag: "南" },
-      "r175-n-3": { x: 562, y: 100, dir: "north_west", arrow: "▲", tag: "北" },
-      "r175-s-2": { x: 488, y: 215, dir: "south_east", arrow: "▼", tag: "南" },
-      "r175-n-2": { x: 582, y: 215, dir: "north_west", arrow: "▲", tag: "北" },
-      "r175-s-3": { x: 508, y: 330, dir: "south_east", arrow: "▼", tag: "南" },
-      "r175-n-1": { x: 602, y: 330, dir: "north_west", arrow: "▲", tag: "北" },
+      "r175-s-1": { x: 462, y: 122, dir: "south_east", arrow: "▼", tag: "南" },
+      "r175-n-3": { x: 568, y: 122, dir: "north_west", arrow: "▲", tag: "北" },
+      "r175-s-2": { x: 486, y: 280, dir: "south_east", arrow: "▼", tag: "南" },
+      "r175-n-2": { x: 592, y: 280, dir: "north_west", arrow: "▲", tag: "北" },
+      "r175-s-3": { x: 508, y: 440, dir: "south_east", arrow: "▼", tag: "南" },
+      "r175-n-1": { x: 612, y: 440, dir: "north_west", arrow: "▲", tag: "北" },
 
       // 東播磨道 (下り・小野方面: 線の上側 / 上り・加古川方面: 線の下側)
-      "hharima-d-1": { x: 395, y: 195, dir: "south_east", arrow: "↗", tag: "小野" },
-      "hharima-u-1": { x: 425, y: 250, dir: "north_west", arrow: "↙", tag: "加古" },
+      "hharima-d-1": { x: 390, y: 265, dir: "south_east", arrow: "↗", tag: "小野" },
+      "hharima-u-1": { x: 430, y: 320, dir: "north_west", arrow: "↙", tag: "加古" },
 
       // 加古川・姫路バイパス (東行: 線の上側 / 西行: 線の下側)
-      "bypass-e-1": { x: 170, y: 260, dir: "south_east", arrow: "▶", tag: "東" },
-      "bypass-w-2": { x: 170, y: 320, dir: "north_west", arrow: "◀", tag: "西" },
-      "bypass-e-2": { x: 350, y: 260, dir: "south_east", arrow: "▶", tag: "東" },
-      "bypass-w-1": { x: 350, y: 320, dir: "north_west", arrow: "◀", tag: "西" },
+      "bypass-e-1": { x: 170, y: 350, dir: "south_east", arrow: "▶", tag: "東" },
+      "bypass-w-2": { x: 170, y: 412, dir: "north_west", arrow: "◀", tag: "西" },
+      "bypass-e-2": { x: 350, y: 350, dir: "south_east", arrow: "▶", tag: "東" },
+      "bypass-w-1": { x: 350, y: 412, dir: "north_west", arrow: "◀", tag: "西" },
 
       // 明姫幹線 (東行: 線の上側 / 西行: 線の下側)
-      "meiki-e-1": { x: 170, y: 360, dir: "south_east", arrow: "▶", tag: "東" },
-      "meiki-w-3": { x: 170, y: 420, dir: "north_west", arrow: "◀", tag: "西" },
-      "meiki-e-2": { x: 330, y: 360, dir: "south_east", arrow: "▶", tag: "東" },
-      "meiki-w-2": { x: 330, y: 420, dir: "north_west", arrow: "◀", tag: "西" },
-      "meiki-e-3": { x: 490, y: 360, dir: "south_east", arrow: "▶", tag: "東" },
-      "meiki-w-1": { x: 490, y: 420, dir: "north_west", arrow: "◀", tag: "西" },
+      "meiki-e-1": { x: 170, y: 490, dir: "south_east", arrow: "▶", tag: "東" },
+      "meiki-w-3": { x: 170, y: 552, dir: "north_west", arrow: "◀", tag: "西" },
+      "meiki-e-2": { x: 330, y: 490, dir: "south_east", arrow: "▶", tag: "東" },
+      "meiki-w-2": { x: 330, y: 552, dir: "north_west", arrow: "◀", tag: "西" },
+      "meiki-e-3": { x: 490, y: 490, dir: "south_east", arrow: "▶", tag: "東" },
+      "meiki-w-1": { x: 490, y: 552, dir: "north_west", arrow: "◀", tag: "西" },
     };
 
     Object.entries(SECTION_LAYOUT).forEach(([secId, pos]) => {
@@ -797,14 +889,22 @@
   });
   $("#load-retry").addEventListener("click", () => load({ manual: true }));
 
-  // 下部ナビのハイライト
-  const navItems = document.querySelectorAll(".nav-item");
-  const io = new IntersectionObserver((entries) => {
-    entries.forEach((en) => {
-      if (en.isIntersecting) navItems.forEach((n) => n.classList.toggle("active", n.getAttribute("href") === `#${en.target.id}`));
+  // 下部ナビゲーションのページ切り替えイベント
+  document.querySelectorAll(".bottom-nav [data-page]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      switchPage(btn.dataset.page);
     });
-  }, { rootMargin: "-45% 0px -50% 0px" });
-  document.querySelectorAll("main .section").forEach((sec) => io.observe(sec));
+  });
+
+  // 概要ページの各サマリーカードクリックでのページ遷移
+  document.querySelectorAll("[data-go-page]").forEach((card) => {
+    card.addEventListener("click", () => {
+      switchPage(card.dataset.goPage);
+    });
+  });
+
+  // 初期ページ表示
+  switchPage(activePage);
 
   load();
   if (!IS_SAMPLE) setInterval(load, 5 * 60 * 1000); // 5分ごとに自動更新

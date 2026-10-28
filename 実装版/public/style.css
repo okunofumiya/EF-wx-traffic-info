@@ -404,3 +404,36 @@ body.mine .count-pill { color: #4a3200; background: #ffe27a; border-color: #f2b2
 }
 .btn-primary-action:hover, .btn-primary-action:active { opacity: .9; }
 
+/* ページ切り替え（SPAタブ） */
+.app-page { display: none; }
+.app-page.active {
+  display: block;
+  animation: pageFade .22s cubic-bezier(0.16, 1, 0.3, 1);
+}
+@keyframes pageFade {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* 概要クイックサマリーカード */
+.summary-cards { display: grid; gap: 10px; }
+.summary-card {
+  padding: 14px 16px; cursor: pointer; border: 1px solid var(--border);
+  transition: all .2s ease; background: var(--surface);
+}
+.summary-card:hover, .summary-card:active {
+  transform: translateY(-2px); border-color: var(--accent);
+  box-shadow: 0 6px 18px rgba(30,110,110,.12);
+}
+.sc-header { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
+.sc-icon { font-size: 22px; flex-shrink: 0; }
+.sc-title-wrap { display: flex; align-items: center; justify-content: space-between; flex: 1; }
+.sc-title-wrap h3 { font-size: 15px; font-weight: 900; color: var(--text); }
+.sc-badge { font-size: 11px; font-weight: 800; padding: 2px 8px; border-radius: 999px; }
+.sc-badge.status-ok { background: var(--ok-soft); color: #1e7047; }
+.sc-badge.status-caution { background: var(--advisory-soft); color: #855b00; }
+.sc-badge.status-alert { background: var(--warning-soft); color: #ad2b20; }
+.sc-desc { font-size: 12px; color: var(--muted); line-height: 1.5; margin-bottom: 8px; }
+.sc-footer { text-align: right; font-size: 11px; font-weight: 700; color: var(--accent); }
+
+
