@@ -1,4 +1,4 @@
-/* 気象・交通状況ダッシュボード v0.9.2-dev（4ページタブ切替対応／気象：スナップショット対応／神鉄運行情報連携／道路交通情報対応） */
+/* 気象・交通状況ダッシュボード v0.9.3-dev（4ページタブ切替対応／気象：スナップショット対応／神鉄運行情報連携／道路交通情報対応） */
 (() => {
   const LV_ORDER = { emergency: 4, danger: 3, warning: 2, advisory: 1 };
   const LV_CLASS = ["none", "advisory", "warning", "danger", "emergency"];
@@ -123,15 +123,15 @@
       text = `気象警報はありません。${trafficNote}`;
     }
 
-    const hero = $("#hero");
-    hero.dataset.level = level;
-    $("#hero-icon").textContent = icon;
-    $("#hero-title").textContent = title;
-    $("#hero-text").textContent = text;
-    countUp($("#stat-warn"), warn);
-    countUp($("#stat-adv"), adv);
-    countUp($("#stat-train"), trainAlertCount);
-    countUp($("#stat-road"), roadDelayCount);
+    const hero = $("#hero"); if (hero) { hero.dataset.level = level; $("#hero-icon").textContent = icon; $("#hero-title").textContent = title; $("#hero-text").textContent = text; countUp($("#stat-warn"), warn); countUp($("#stat-adv"), adv); countUp($("#stat-train"), trainAlertCount); countUp($("#stat-road"), roadDelayCount); }
+
+
+
+
+
+
+
+
     document.documentElement.style.setProperty("--orb3", level === "alert" ? "#f43f5e" : level === "caution" ? "#f59e0b" : "#10b981");
 
     renderSummaryCards(warn, adv, trainAlertCount, roadDelayCount, roadDelayed);
@@ -139,6 +139,217 @@
 
   // 概要ページの各サマリーカードのバッジ・テキスト更新
   function renderSummaryCards(warn, adv, trainAlertCount, roadDelayCount, roadDelayed) {
+    const areas = visibleAreas();
+    const warnAreas = [];
+    const advAreas = [];
+    areas.forEach((a) => {
+      const list = (model.warnings[a] || []).slice().sort((x, y) => LV_ORDER[y.level] - LV_ORDER[x.level]);
+      const lv = maxLevel(list);
+      if (!lv) return;
+      if (LV_ORDER[lv] >= 2) warnAreas.push({ area: a, level: lv, list });
+      else advAreas.push({ area: a, level: lv, list });
+    });
+
+    // 1. 気象情報サマリーカード
+    const wCard = $("#sc-card-weather");
+    const wBadge = $("#sc-weather-badge");
+    const wBody = $("#sc-weather-body");
+    if (wCard && wBadge && wBody) {
+      if (warnAreas.length > 0) {
+        wCard.dataset.status = "alert";
+        wBadge.className = "sc-badge status-alert";
+        wBadge.textContent = `警報 ${warnAreas.length}地域`;
+      } else if (advAreas.length > 0) {
+        wCard.dataset.status = "caution";
+        wBadge.className = "sc-badge status-caution";
+        wBadge.textContent = `注意報 ${advAreas.length}地域`;
+      } else {
+        wCard.dataset.status = "ok";
+        wBadge.className = "sc-badge status-ok";
+        wBadge.textContent = "発表なし";
+      }
+
+      // 明日までの見通しと5日先までの警報級の可能性を集計
+      const outlookWarn = areas.filter((a) => (model.outlook[a] || []).some((h) => h.peakLevel >= 3));
+      const outlookAdv = areas.filter((a) => (model.outlook[a] || []).some((h) => h.peakLevel === 2));
+      let outlookSummary = "注意報級以上の予報なし";
+      if (outlookWarn.length > 0) {
+        outlookSummary = `警報級の見込みあり（${outlookWarn.slice(0, 3).join("・")}${outlookWarn.length > 3 ? `ほか${outlookWarn.length - 3}地域` : ""}）`;
+      } else if (outlookAdv.length > 0) {
+        outlookSummary = `注意報級の見込みあり（${outlookAdv.slice(0, 3).join("・")}${outlookAdv.length > 3 ? `ほか${outlookAdv.length - 3}地域` : ""}）`;
+      }
+
+      const earlyHighMid = [];
+      Object.entries(model.early?.rows || {}).forEach(([type, vals]) => {
+        vals.forEach((v, idx) => {
+          if (v === "高" || v === "中") {
+            const d = model.early.days[idx];
+            if (d) earlyHighMid.push(`${d.d}日(${d.w}) ${type}[${v}]`);
+          }
+        });
+      });
+      const earlySummary = earlyHighMid.length > 0
+        ? earlyHighMid.slice(0, 3).join("、") + (earlyHighMid.length > 3 ? " ほか" : "")
+        : "［高・中］の発表なし";
+
+      let currentHtml = "";
+      if (warnAreas.length > 0 || advAreas.length > 0) {
+        const lines = [];
+        if (warnAreas.length > 0) {
+          const wText = warnAreas
+            .slice(0, 4)
+            .map((x) => `${esc(x.area)}（${x.list.map((w) => esc(w.type)).join("・")}）`)
+            .join("、") + (warnAreas.length > 4 ? ` ほか${warnAreas.length - 4}地域` : "");
+          lines.push(`<div class="sc-info-line"><span class="sc-info-label">🚨 警報</span><span><b>${wText}</b></span></div>`);
+          const firstOutlook = warnAreas[0]?.list[0]?.outlook;
+          if (firstOutlook) {
+            lines.push(`<div class="sc-info-line"><span class="sc-info-label">⏳ 見込み</span><span>${esc(warnAreas[0].area)}：${esc(firstOutlook)}</span></div>`);
+          }
+        }
+        if (advAreas.length > 0) {
+          const advTypes = [...new Set(advAreas.flatMap((x) => x.list.map((w) => w.type)))];
+          const aNames = advAreas.slice(0, 4).map((x) => esc(x.area)).join("・") + (advAreas.length > 4 ? `ほか${advAreas.length - 4}地域` : "");
+          lines.push(`<div class="sc-info-line"><span class="sc-info-label">⚠️ 注意報</span><span>${aNames}（${advTypes.slice(0, 4).map(esc).join("・")}）</span></div>`);
+        }
+        currentHtml = `<div class="sc-info-box ${warnAreas.length ? "alert" : "caution"}">${lines.join("")}</div>`;
+      } else {
+        currentHtml = `<p class="sc-desc">✅ 現在、対象地域に発表中の気象警報・注意報はありません。</p>`;
+      }
+
+      wBody.innerHTML = `
+        <div class="sc-stat-row">
+          <span class="sc-stat-pill ${warnAreas.length ? "is-alert" : ""}">警報 <b>${warnAreas.length}</b> 地域</span>
+          <span class="sc-stat-pill ${advAreas.length ? "is-caution" : ""}">注意報 <b>${advAreas.length}</b> 地域</span>
+          <span class="sc-stat-scope">${mine() ? `★マイ ${areas.length}地域` : `全${areas.length}地域`}</span>
+        </div>
+        ${currentHtml}
+        <div class="sc-info-box">
+          <div class="sc-info-line"><span class="sc-info-label">📅 明日まで</span><span>${esc(outlookSummary)}</span></div>
+          <div class="sc-info-line"><span class="sc-info-label">📊 5日先まで</span><span>${esc(earlySummary)}</span></div>
+        </div>
+      `;
+    }
+
+    // 2. 電車の運行状況サマリーカード
+    const tCard = $("#sc-card-train");
+    const tBadge = $("#sc-train-badge");
+    const tBody = $("#sc-train-body");
+    if (tCard && tBadge && tBody) {
+      const shinSt = getLineStatus("shintetsu");
+      if (shinSt.hasAlert) {
+        tCard.dataset.status = "alert";
+        tBadge.className = "sc-badge status-alert";
+        tBadge.textContent = "運行情報あり";
+      } else if (shinSt.status === "ok") {
+        tCard.dataset.status = "ok";
+        tBadge.className = "sc-badge status-ok";
+        tBadge.textContent = "平常運転";
+      } else {
+        tCard.dataset.status = "ok";
+        tBadge.className = "sc-badge status-na";
+        tBadge.textContent = shinSt.label;
+      }
+
+      const trainLines = TRAIN_LINES.filter((l) => !mine() || linePins.has(l.id));
+      const otherLines = trainLines.filter((l) => l.id !== "shintetsu");
+      const otherNames = otherLines.length ? otherLines.map((l) => l.name).join("・") : "JR神戸線・JR加古川線・山陽電車";
+
+      tBody.innerHTML = `
+        <div class="sc-train-list">
+          <div class="sc-train-row ${shinSt.hasAlert ? "is-alert" : ""}">
+            <span class="sc-train-dot" style="background:#f97316"></span>
+            <span class="sc-train-name">神戸電鉄 全線</span>
+            <span class="sc-train-sub">${esc(shinSt.text || "粟生線・有馬線・三田線など")}</span>
+            <span class="sc-train-st ${shinSt.hasAlert ? "alert" : "ok"}">${esc(shinSt.label)}</span>
+          </div>
+          <div class="sc-train-row">
+            <span class="sc-train-dot" style="background:#1e6fd9"></span>
+            <span class="sc-train-name">${esc(otherNames)}</span>
+            <span class="sc-train-st link">各社公式情報 ›</span>
+          </div>
+        </div>
+      `;
+    }
+
+    // 3. 道路情報サマリーカード
+    const rCard = $("#sc-card-road");
+    const rBadge = $("#sc-road-badge");
+    const rBody = $("#sc-road-body");
+    if (rCard && rBadge && rBody) {
+      const roadSections = trafficData?.sections || [];
+      const heavySecs = roadSections.filter((s) => s.status === "heavy");
+      const crowdedSecs = roadSections.filter((s) => s.status === "crowded");
+      const delayedSecs = roadSections.filter((s) => s.delayMin >= 2).sort((a, b) => b.delayMin - a.delayMin);
+
+      if (heavySecs.length > 0) {
+        rCard.dataset.status = "alert";
+        rBadge.className = "sc-badge status-alert";
+        rBadge.textContent = `渋滞 ${heavySecs.length}区間`;
+      } else if (crowdedSecs.length > 0) {
+        rCard.dataset.status = "caution";
+        rBadge.className = "sc-badge status-caution";
+        rBadge.textContent = `混雑 ${crowdedSecs.length}区間`;
+      } else if (delayedSecs.length > 0) {
+        rCard.dataset.status = "ok";
+        rBadge.className = "sc-badge status-ok";
+        rBadge.textContent = `おおむね順調`;
+      } else {
+        rCard.dataset.status = "ok";
+        rBadge.className = "sc-badge status-ok";
+        rBadge.textContent = "順調";
+      }
+
+      const shortRoadName = {
+        r175: "国道175号",
+        higashiharima: "東播磨道",
+        bypass: "加古川・姫路BP",
+        meiki: "明姫幹線",
+      };
+
+      const gridHtml = ROAD_LINES.map((rl) => {
+        const lSecs = roadSections.filter((s) => s.road === rl.id);
+        const maxD = lSecs.reduce((m, s) => Math.max(m, s.delayMin || 0), 0);
+        const st = lSecs.some((s) => s.status === "heavy")
+          ? "heavy"
+          : lSecs.some((s) => s.status === "crowded")
+          ? "crowded"
+          : "normal";
+        const stLabel =
+          st === "heavy"
+            ? `🔴 渋滞 +${maxD}分`
+            : st === "crowded"
+            ? `🟡 混雑 +${maxD}分`
+            : maxD >= 2
+            ? `🟢 順調 (+${maxD}分)`
+            : "🟢 順調";
+        return `
+          <div class="sc-road-cell status-${st}">
+            <span class="sc-road-name"><i class="sc-train-dot" style="background:${rl.color}"></i>${esc(shortRoadName[rl.id] || rl.name)}</span>
+            <span class="sc-road-val status-${st}">${stLabel}</span>
+          </div>
+        `;
+      }).join("");
+
+      let delayDetailHtml = "";
+      if (delayedSecs.length > 0) {
+        const items = delayedSecs.slice(0, 3).map((s) => {
+          const icon = s.status === "heavy" ? "🔴" : s.status === "crowded" ? "🟡" : "⏱";
+          return `<div class="sc-info-line"><span class="sc-info-label">${icon} ${esc(shortRoadName[s.road] || s.roadName)}</span><span>${esc(s.name)}：<b>${s.durationInTrafficMin}分</b>（通常+${s.delayMin}分）</span></div>`;
+        }).join("");
+        const more = delayedSecs.length > 3 ? `<div class="sc-info-line"><span class="sc-info-label"></span><span>ほか ${delayedSecs.length - 3} 区間で軽微な遅れ</span></div>` : "";
+        const boxCls = heavySecs.length ? "alert" : crowdedSecs.length ? "caution" : "";
+        delayDetailHtml = `<div class="sc-info-box ${boxCls}">${items}${more}</div>`;
+      } else {
+        delayDetailHtml = `<p class="sc-desc">✅ 全${roadSections.length || 18}区間で遅れはなく、スムーズに流れています。</p>`;
+      }
+
+      rBody.innerHTML = `
+        <div class="sc-road-grid">${gridHtml}</div>
+        ${delayDetailHtml}
+      `;
+    }
+  }
+  function renderSummaryCards_OLD(warn, adv, trainAlertCount, roadDelayCount, roadDelayed) {
     // 1. 気象サマリー
     const wBadge = $("#sc-weather-badge");
     const wDesc = $("#sc-weather-desc");
