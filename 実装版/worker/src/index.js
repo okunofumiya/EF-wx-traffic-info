@@ -1,5 +1,5 @@
 // Cloudflare Workers の入口。
-// - scheduled: 定期的に気象庁・神戸電鉄から取得 → 整形 → KV に保存（変化があったときだけ書き込む）＆ Chatwork 通知
+// - scheduled: 定期的に気象庁・神戸電鉄・道路交通情報を取得 → 整形 → KV に保存 ＆ Chatwork 通知
 // - fetch: ダッシュボード向けに保存済みのスナップショット等を返す
 
 import { sourceUrls, SHINTETSU } from "./config.js";
@@ -9,21 +9,54 @@ import {
   buildWeatherAlertMessage,
   buildShintetsuAlertMessage,
 } from "./chatwork.js";
-import { fetchGoogleTraffic } from "./traffic.js";
+import { fetchGoogleTraffic, shouldUpdateTraffic, generateMockTraffic } from "./traffic.js";
 
 const KEY_SNAPSHOT = "snapshot";
 const KEY_CHECKED = "checkedAt"; // 最後に気象庁から取得できた時刻
 const KEY_EVENTS = "events"; // 直近の変化
 const KEY_SHINTETSU = "shintetsu_summary"; // 神戸電鉄の直近ステータス
 const KEY_TRAFFIC = "traffic_snapshot"; // 道路交通情報
-const KEY_TRAFFIC_CHECKED = "traffic_checkedAt"; // 道路情報の取得時刻
+const KEY_TRAFFIC_CHECKED = "traffic_checkedAt"; // 道路情報の取得時刻（ミリ秒）
 const MAX_EVENTS = 100;
-const TRAFFIC_CACHE_MS = 5 * 60 * 1000; // 5分キャッシュ
 
 async function fetchJson(url) {
   const res = await fetch(url, { headers: { "User-Agent": "keihou-dashboard/0.1" } });
   if (!res.ok) throw new Error(`${res.status} ${url}`);
   return res.json();
+}
+
+/**
+ * 道路交通情報のスケジュール更新（7〜9時・17〜19時は10分毎、9〜17時は1時間毎）
+ */
+export async function refreshTrafficIfNeeded(env, now = Date.now()) {
+  try {
+    const lastCheckedStr = await env.KV.get(KEY_TRAFFIC_CHECKED);
+    const lastChecked = lastCheckedStr ? Number(lastCheckedStr) : 0;
+    const existing = await env.KV.get(KEY_TRAFFIC);
+    const parsedExisting = existing ? JSON.parse(existing) : null;
+    const isUpgradingFromMock = Boolean(env.GOOGLE_MAPS_API_KEY && (!parsedExisting || parsedExisting.isMock || !parsedExisting.quota));
+
+    // 既に実データがあり、かつスケジュール更新タイミングでない場合はスキップ（無料枠の厳格保護）
+    if (existing && !isUpgradingFromMock && !shouldUpdateTraffic(now, lastChecked)) {
+      return { updated: false };
+    }
+
+    // APIキー未設定の初回で夜間（スケジュール外）の場合は、モック/基準値で初期化
+    if (!existing && !env.GOOGLE_MAPS_API_KEY && !shouldUpdateTraffic(now, 0)) {
+      const initData = generateMockTraffic(now);
+      await env.KV.put(KEY_TRAFFIC, JSON.stringify(initData));
+      await env.KV.put(KEY_TRAFFIC_CHECKED, String(now));
+      return { updated: true, initializedWithBase: true };
+    }
+
+    const trafficData = await fetchGoogleTraffic(env.GOOGLE_MAPS_API_KEY, now, env.KV);
+    await env.KV.put(KEY_TRAFFIC, JSON.stringify(trafficData));
+    await env.KV.put(KEY_TRAFFIC_CHECKED, String(now));
+    return { updated: true, isMock: trafficData.isMock };
+  } catch (err) {
+    console.error("Traffic scheduled refresh error:", err);
+    return { updated: false, error: err.message };
+  }
 }
 
 export async function refresh(env, now = Date.now()) {
@@ -73,6 +106,9 @@ export async function refresh(env, now = Date.now()) {
     console.error("Shintetsu summary fetch error:", err);
   }
 
+  // 3. 道路交通情報のスケジュール更新判定（7〜9時/17〜19時は10分毎、9〜17時は1時間毎）
+  await refreshTrafficIfNeeded(env, now);
+
   // スナップショット本体は、内容が同じなら書き込まない（KV の書き込み回数の節約）
   const strip = (s) => JSON.stringify({ ...s, generatedAt: null });
   if (prev && strip(prev) === strip(next)) return { changed: false, events: [] };
@@ -100,29 +136,16 @@ export default {
     const { pathname } = new URL(request.url);
 
     // 道路交通情報API (/api/traffic)
+    // ※ブラウザからのアクセスでは原則KVキャッシュを返し、指定スケジュール時のみ更新する
     if (pathname === "/api/traffic") {
       try {
-        const lastCheckedStr = await env.KV.get(KEY_TRAFFIC_CHECKED);
-        const lastChecked = lastCheckedStr ? Number(lastCheckedStr) : 0;
         const now = Date.now();
-
-        // 5分以内のキャッシュがあればそれを返す
-        if (now - lastChecked < TRAFFIC_CACHE_MS) {
-          const cached = await env.KV.get(KEY_TRAFFIC);
-          if (cached) {
-            return new Response(cached, {
-              headers: { "Content-Type": "application/json; charset=utf-8", ...CORS },
-            });
-          }
+        await refreshTrafficIfNeeded(env, now);
+        let cached = await env.KV.get(KEY_TRAFFIC);
+        if (!cached) {
+          cached = JSON.stringify(generateMockTraffic(now));
         }
-
-        // キャッシュ切れまたは初回: Google Maps API またはモック生成
-        const trafficData = await fetchGoogleTraffic(env.GOOGLE_MAPS_API_KEY, now);
-        const jsonBody = JSON.stringify(trafficData);
-        await env.KV.put(KEY_TRAFFIC, jsonBody);
-        await env.KV.put(KEY_TRAFFIC_CHECKED, String(now));
-
-        return new Response(jsonBody, {
+        return new Response(cached, {
           headers: { "Content-Type": "application/json; charset=utf-8", ...CORS },
         });
       } catch (err) {
@@ -154,4 +177,3 @@ export default {
     return new Response(body, { headers: { "Content-Type": "application/json; charset=utf-8", ...CORS } });
   },
 };
-

@@ -1,4 +1,4 @@
-/* 気象・交通状況ダッシュボード v0.9.3-dev（4ページタブ切替対応／気象：スナップショット対応／神鉄運行情報連携／道路交通情報対応） */
+/* 気象・交通状況ダッシュボード v0.9.4-dev（4ページタブ切替対応／気象：スナップショット対応／神鉄運行情報連携／道路交通情報対応） */
 (() => {
   const LV_ORDER = { emergency: 4, danger: 3, warning: 2, advisory: 1 };
   const LV_CLASS = ["none", "advisory", "warning", "danger", "emergency"];
@@ -51,6 +51,17 @@
     Math.max(LV_ORDER[maxLevel(model.warnings[a])] || 0, ...(model.outlook[a] || []).map((h) => h.peakLevel - 1), 0);
 
   const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const fmtTrafficCheckedAt = (iso) => {
+    if (!iso) return "取得時刻不明";
+    const ms = Date.parse(iso);
+    if (Number.isNaN(ms)) return "取得時刻不明";
+    const jst = new Date(ms + 9 * 3600 * 1000);
+    const m = jst.getUTCMonth() + 1;
+    const d = jst.getUTCDate();
+    const hh = String(jst.getUTCHours()).padStart(2, "0");
+    const mm = String(jst.getUTCMinutes()).padStart(2, "0");
+    return `${m}月${d}日 ${hh}:${mm} 現在の情報`;
+  };
 
   function render() {
     renderMeta();
@@ -344,6 +355,10 @@
       }
 
       rBody.innerHTML = `
+        <div class="sc-stat-row">
+          <span class="sc-stat-pill">🕒 ${esc(fmtTrafficCheckedAt(trafficData?.checkedAt))}</span>
+          <span class="sc-stat-scope">${trafficData?.isMock ? "基準時間（テスト）" : "リアルタイム"}</span>
+        </div>
         <div class="sc-road-grid">${gridHtml}</div>
         ${delayDetailHtml}
       `;
@@ -592,6 +607,10 @@
       countEl.textContent = `全${sections.length}区間${delayedSections.length > 0 ? `（遅れ${delayedSections.length}件）` : ""}`;
     }
 
+    const checkedEl = $("#road-checked-at");
+    if (checkedEl) {
+      checkedEl.textContent = fmtTrafficCheckedAt(trafficData?.checkedAt);
+    }
     const badgeEl = $("#road-source-badge");
     if (badgeEl) {
       badgeEl.textContent = trafficData?.isMock
@@ -850,7 +869,7 @@
     $("#road-sheet-base").textContent = `${sec.durationMin} 分`;
     $("#road-sheet-delay").textContent = sec.delayMin > 0 ? `+${sec.delayMin} 分` : "なし";
 
-    let desc = `区間距離：約 ${sec.distanceKm} km (${sec.directionLabel})`;
+    let desc = `${fmtTrafficCheckedAt(trafficData?.checkedAt)} ／ 区間距離：約 ${sec.distanceKm} km (${sec.directionLabel})`;
     if (sec.delayMin >= 8) {
       desc += "。現在、大幅な渋滞が発生しています。別ルートの検討や出発時間の調整をおすすめします。";
     } else if (sec.delayMin >= 3) {

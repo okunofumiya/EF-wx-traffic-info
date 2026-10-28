@@ -481,5 +481,13 @@ body.mine .count-pill { color: #4a3200; background: #ffe27a; border-color: #f2b2
 .sc-road-val.status-normal { color: #1e7047; }
 .sc-road-val.status-crowded { color: #855b00; }
 .sc-road-val.status-heavy { color: #ad2b20; }
+.road-time-banner {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 6px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+  padding: 8px 12px; margin-bottom: 12px; font-size: 12px; font-weight: 800; color: var(--text);
+  box-shadow: 0 2px 8px rgba(30, 110, 110, .06);
+}
+.road-time-icon { font-size: 14px; }
+.road-source-tag { margin-left: auto; font-size: 11px; font-weight: 700; color: var(--muted); }
 
 

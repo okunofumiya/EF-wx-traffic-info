@@ -1,4 +1,6 @@
 // 道路交通情報（区間所要時間）の定義と取得・算出ロジック
+// Google Maps Platform Routes API (computeRoutes / computeRouteMatrix) 対応
+// 無料枠（各SKU 月5,000回）を絶対に超えないための片道ルート集約＆月間クォータ保護付き
 
 export const TRAFFIC_SECTIONS = [
   // 1. 国道175号 南行き (滝野社IC -> 森友)
@@ -270,6 +272,19 @@ export const TRAFFIC_SECTIONS = [
   },
 ];
 
+// 片道ずつ連続する区間グループ（折り返しによる迂回を防ぎつつ1リクエストに集約）
+export const ROUTE_CHAINS = [
+  { id: "r175-s", sectionIds: ["r175-s-1", "r175-s-2", "r175-s-3"] },
+  { id: "r175-n", sectionIds: ["r175-n-1", "r175-n-2", "r175-n-3"] },
+  { id: "meiki-e", sectionIds: ["meiki-e-1", "meiki-e-2", "meiki-e-3"] },
+  { id: "meiki-w", sectionIds: ["meiki-w-1", "meiki-w-2", "meiki-w-3"] },
+];
+
+// 各SKUの無料枠（月5,000回）に対する安全上限（4,850回で自動停止）
+export const MONTHLY_FREE_CAP_LIMIT = 4850;
+// バイパス東行（2区間）を computeRoutes から computeRouteMatrix に切り替える閾値
+export const BYPASS_SWITCH_THRESHOLD = 4750;
+
 /**
  * Google Maps URL生成（経路案内）
  */
@@ -278,24 +293,91 @@ export function buildGoogleMapsRouteUrl(origin, destination) {
 }
 
 /**
+ * 更新スケジュール判定（日本時間 JST 基準）
+ * - 7:00〜8:59、17:00〜18:59 : 10分ごとに更新（前回更新から8分以上経過で許可）
+ * - 9:00〜16:59、19:00〜19:09 : 1時間ごとに更新（毎時0〜9分かつ前回更新から50分以上経過で許可）
+ * - 19:10〜翌6:59 : 更新しない
+ */
+export function shouldUpdateTraffic(nowMs = Date.now(), lastCheckedMs = 0) {
+  const jst = new Date(nowMs + 9 * 3600 * 1000);
+  const hour = jst.getUTCHours();
+  const min = jst.getUTCMinutes();
+  const elapsedMin = (nowMs - lastCheckedMs) / 60000;
+
+  // 7:00〜8:59 または 17:00〜18:59 → 10分間隔
+  if (hour === 7 || hour === 8 || hour === 17 || hour === 18) {
+    return elapsedMin >= 8 && min % 10 < 5;
+  }
+
+  // 9:00〜16:59 または 19:00台（19:00の最終更新） → 毎時0分台（0〜4分）の1回のみ更新
+  if ((hour >= 9 && hour <= 16) || hour === 19) {
+    return elapsedMin >= 8 && min < 5;
+  }
+
+  // 夜間・早朝（19:05〜翌6:59）は更新しない
+  return false;
+}
+
+/**
+ * 日本時間の年月キー（例: "2026-10"）を返す
+ */
+export function getJstMonthKey(nowMs = Date.now()) {
+  const jst = new Date(nowMs + 9 * 3600 * 1000);
+  return jst.toISOString().slice(0, 7);
+}
+
+/**
+ * 秒数文字列（例: "1020s"）を数値（秒）に変換
+ */
+export function parseDurationSec(durationStr, fallbackSec) {
+  if (!durationStr || typeof durationStr !== "string") return fallbackSec;
+  const val = parseFloat(durationStr.replace("s", ""));
+  return Number.isFinite(val) && val > 0 ? Math.round(val) : fallbackSec;
+}
+
+/**
+ * 秒数から画面表示用の区間オブジェクトを組み立てる
+ */
+function buildSectionResult(sec, durationSec, durationInTrafficSec) {
+  const delaySec = Math.max(0, durationInTrafficSec - durationSec);
+  const durationMin = Math.round(durationSec / 60);
+  const durationInTrafficMin = Math.round(durationInTrafficSec / 60);
+  const delayMin = Math.round(delaySec / 60);
+  const status = delayMin >= 8 ? "heavy" : delayMin >= 3 ? "crowded" : "normal";
+
+  return {
+    id: sec.id,
+    road: sec.road,
+    roadName: sec.roadName,
+    direction: sec.direction,
+    directionLabel: sec.directionLabel,
+    name: sec.name,
+    from: sec.from,
+    to: sec.to,
+    distanceKm: sec.distanceKm,
+    durationMin,
+    durationInTrafficMin,
+    delayMin,
+    status,
+    mapUrl: buildGoogleMapsRouteUrl(sec.origin, sec.destination),
+  };
+}
+
+/**
  * モック交通データの生成（APIキー未設定時・テスト用）
- * 基準所要時間をもとに、各区間の所要時間と遅延状態を算出
  */
 export function generateMockTraffic(now = Date.now()) {
-  const d = new Date(now);
-  const hour = d.getHours();
-  // 朝夕の通勤時間帯はやや混雑しやすいシミュレーション
+  const jst = new Date(now + 9 * 3600 * 1000);
+  const hour = jst.getUTCHours();
   const isRush = (hour >= 7 && hour <= 9) || (hour >= 17 && hour <= 19);
 
   const sections = TRAFFIC_SECTIONS.map((sec, idx) => {
     let delayMin = 0;
-    // 擬似的な渋滞生成（一部のボトルネック区間：バイパスや明姫幹線）
     if (isRush) {
       if (sec.road === "bypass" && sec.id.includes("1")) delayMin = 6;
       else if (sec.road === "meiki" && sec.id.includes("2")) delayMin = 4;
       else if (sec.road === "r175" && sec.id.includes("2")) delayMin = 3;
     } else {
-      // 日中・夜間の軽微なブレ（1〜2分）
       if (idx % 5 === 1) delayMin = 2;
     }
 
@@ -316,7 +398,7 @@ export function generateMockTraffic(now = Date.now()) {
       durationMin,
       durationInTrafficMin,
       delayMin,
-      status, // "normal" (順調) | "crowded" (混雑) | "heavy" (渋滞)
+      status,
       mapUrl: buildGoogleMapsRouteUrl(sec.origin, sec.destination),
     };
   });
@@ -329,86 +411,174 @@ export function generateMockTraffic(now = Date.now()) {
 }
 
 /**
- * Google Maps Distance Matrix API を呼び出してリアルタイム交通情報を取得
+ * Google Routes API: computeRoutes（片道複数区間を1リクエストで取得）
  */
-export async function fetchGoogleTraffic(apiKey, now = Date.now()) {
+async function callComputeRoutes(apiKey, chainSections) {
+  const first = chainSections[0];
+  const last = chainSections[chainSections.length - 1];
+  const intermediates = chainSections.slice(0, -1).map((s) => ({
+    location: { latLng: { latitude: s.destination.lat, longitude: s.destination.lng } },
+  }));
+
+  const body = {
+    origin: { location: { latLng: { latitude: first.origin.lat, longitude: first.origin.lng } } },
+    destination: { location: { latLng: { latitude: last.destination.lat, longitude: last.destination.lng } } },
+    intermediates,
+    travelMode: "DRIVE",
+    routingPreference: "TRAFFIC_AWARE",
+  };
+
+  const res = await fetch("https://routes.googleapis.com/directions/v2:computeRoutes", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Goog-Api-Key": apiKey,
+      "X-Goog-FieldMask": "routes.legs.duration,routes.legs.staticDuration",
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (!res.ok) {
+    const errText = await res.text().catch(() => "");
+    throw new Error(`computeRoutes HTTP ${res.status}: ${errText.slice(0, 200)}`);
+  }
+  const data = await res.json();
+  const legs = data?.routes?.[0]?.legs;
+  if (!Array.isArray(legs) || legs.length !== chainSections.length) {
+    throw new Error(`computeRoutes legs mismatch: expected ${chainSections.length}, got ${legs?.length}`);
+  }
+
+  return chainSections.map((sec, idx) => {
+    const leg = legs[idx];
+    const staticSec = parseDurationSec(leg.staticDuration, sec.baseDurationSec);
+    const trafficSec = parseDurationSec(leg.duration, staticSec);
+    return buildSectionResult(sec, staticSec, trafficSec);
+  });
+}
+
+/**
+ * Google Routes API: computeRouteMatrix（1区間＝1要素で取得）
+ */
+async function callComputeRouteMatrixSingle(apiKey, sec) {
+  const body = {
+    origins: [{ waypoint: { location: { latLng: { latitude: sec.origin.lat, longitude: sec.origin.lng } } } }],
+    destinations: [{ waypoint: { location: { latLng: { latitude: sec.destination.lat, longitude: sec.destination.lng } } } }],
+    travelMode: "DRIVE",
+    routingPreference: "TRAFFIC_AWARE",
+  };
+
+  const res = await fetch("https://routes.googleapis.com/distanceMatrix/v2:computeRouteMatrix", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Goog-Api-Key": apiKey,
+      "X-Goog-FieldMask": "originIndex,destinationIndex,duration,staticDuration,condition",
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (!res.ok) {
+    const errText = await res.text().catch(() => "");
+    throw new Error(`computeRouteMatrix HTTP ${res.status}: ${errText.slice(0, 200)}`);
+  }
+  const data = await res.json();
+  const elem = Array.isArray(data) ? data[0] : null;
+  if (!elem || (elem.condition && elem.condition !== "ROUTE_EXISTS")) {
+    throw new Error(`computeRouteMatrix condition: ${elem?.condition || "EMPTY"}`);
+  }
+
+  const staticSec = parseDurationSec(elem.staticDuration, sec.baseDurationSec);
+  const trafficSec = parseDurationSec(elem.duration, staticSec);
+  return buildSectionResult(sec, staticSec, trafficSec);
+}
+
+/**
+ * Google Maps Routes API を呼び出して全18区間のリアルタイム交通情報を取得
+ * - 片道ずつ正確に取得（折り返しなし）
+ * - Compute Routes Pro と Compute Route Matrix Pro の2つの無料枠（各月5,000回）に分散
+ * - KV の月間カウンターで無料枠上限（4,850回）を厳守
+ */
+export async function fetchGoogleTraffic(apiKey, now = Date.now(), kv = null) {
   if (!apiKey) {
     return generateMockTraffic(now);
   }
 
-  // 16区間を並行取得（16要素）
-  const results = await Promise.allSettled(
-    TRAFFIC_SECTIONS.map(async (sec) => {
-      const url = new URL("https://maps.googleapis.com/maps/api/distancematrix/json");
-      url.searchParams.set("origins", `${sec.origin.lat},${sec.origin.lng}`);
-      url.searchParams.set("destinations", `${sec.destination.lat},${sec.destination.lng}`);
-      url.searchParams.set("departure_time", "now");
-      url.searchParams.set("traffic_model", "best_guess");
-      url.searchParams.set("key", apiKey);
+  const secById = Object.fromEntries(TRAFFIC_SECTIONS.map((s) => [s.id, s]));
+  const monthKey = getJstMonthKey(now);
+  const keyRoutesQuota = `traffic_quota_routes_${monthKey}`;
+  const keyMatrixQuota = `traffic_quota_matrix_${monthKey}`;
 
-      const res = await fetch(url.toString());
-      if (!res.ok) throw new Error(`Google Maps API error: ${res.status}`);
-      const data = await res.json();
+  let routesUsed = 0;
+  let matrixUsed = 0;
+  if (kv) {
+    routesUsed = Number((await kv.get(keyRoutesQuota)) || 0);
+    matrixUsed = Number((await kv.get(keyMatrixQuota)) || 0);
+  }
 
-      const element = data?.rows?.[0]?.elements?.[0];
-      if (!element || element.status !== "OK") {
-        throw new Error(`Route status: ${element?.status || "UNKNOWN"}`);
-      }
+  const resolvedMap = {};
+  const tasks = [];
 
-      const durationSec = element.duration.value;
-      const durationInTrafficSec = element.duration_in_traffic ? element.duration_in_traffic.value : durationSec;
-      const delaySec = Math.max(0, durationInTrafficSec - durationSec);
+  // 1. 4本の3区間ルート（175号南行・北行、明姫幹線東行・西行） -> computeRoutes (4リクエスト)
+  const chainsToRun = [...ROUTE_CHAINS];
+  // バイパス東行（2区間）は computeRoutes の使用量が 4,750 未満なら computeRoutes（1リクエスト）、それ以降は computeRouteMatrix（2要素）へ自動振替
+  const useRoutesForBypassEast = routesUsed + 5 <= BYPASS_SWITCH_THRESHOLD;
+  if (useRoutesForBypassEast) {
+    chainsToRun.push({ id: "bypass-e", sectionIds: ["bypass-e-1", "bypass-e-2"] });
+  }
 
-      const durationMin = Math.round(durationSec / 60);
-      const durationInTrafficMin = Math.round(durationInTrafficSec / 60);
-      const delayMin = Math.round(delaySec / 60);
-      const status = delayMin >= 8 ? "heavy" : delayMin >= 3 ? "crowded" : "normal";
+  if (routesUsed + chainsToRun.length <= MONTHLY_FREE_CAP_LIMIT) {
+    routesUsed += chainsToRun.length;
+    for (const chain of chainsToRun) {
+      const chainSecs = chain.sectionIds.map((id) => secById[id]);
+      tasks.push(
+        callComputeRoutes(apiKey, chainSecs).then((list) => {
+          for (const item of list) resolvedMap[item.id] = item;
+        })
+      );
+    }
+  }
 
-      return {
-        id: sec.id,
-        road: sec.road,
-        roadName: sec.roadName,
-        direction: sec.direction,
-        directionLabel: sec.directionLabel,
-        name: sec.name,
-        from: sec.from,
-        to: sec.to,
-        distanceKm: sec.distanceKm,
-        durationMin,
-        durationInTrafficMin,
-        delayMin,
-        status,
-        mapUrl: buildGoogleMapsRouteUrl(sec.origin, sec.destination),
-      };
-    })
-  );
+  // 2. 東播磨道（下り・上り）＋バイパス西行（2区間）[＋振替時のバイパス東行] -> computeRouteMatrix
+  const matrixSecIds = ["hharima-d-1", "hharima-u-1", "bypass-w-1", "bypass-w-2"];
+  if (!useRoutesForBypassEast) {
+    matrixSecIds.push("bypass-e-1", "bypass-e-2");
+  }
 
-  // 取得成功したものを採用し、失敗した区間はベース値でフォールバック
-  const sections = TRAFFIC_SECTIONS.map((sec, i) => {
-    const res = results[i];
-    if (res.status === "fulfilled") return res.value;
-    const durationMin = Math.round(sec.baseDurationSec / 60);
-    return {
-      id: sec.id,
-      road: sec.road,
-      roadName: sec.roadName,
-      direction: sec.direction,
-      directionLabel: sec.directionLabel,
-      name: sec.name,
-      from: sec.from,
-      to: sec.to,
-      distanceKm: sec.distanceKm,
-      durationMin,
-      durationInTrafficMin: durationMin,
-      delayMin: 0,
-      status: "normal",
-      mapUrl: buildGoogleMapsRouteUrl(sec.origin, sec.destination),
-    };
+  if (matrixUsed + matrixSecIds.length <= MONTHLY_FREE_CAP_LIMIT) {
+    matrixUsed += matrixSecIds.length;
+    for (const id of matrixSecIds) {
+      const sec = secById[id];
+      tasks.push(
+        callComputeRouteMatrixSingle(apiKey, sec).then((item) => {
+          resolvedMap[item.id] = item;
+        })
+      );
+    }
+  }
+
+  const results = await Promise.allSettled(tasks);
+  const errors = results.filter((r) => r.status === "rejected").map((r) => r.reason?.message || String(r.reason));
+
+  // 月間カウンターをKVに保存
+  if (kv) {
+    await Promise.allSettled([
+      kv.put(keyRoutesQuota, String(routesUsed)),
+      kv.put(keyMatrixQuota, String(matrixUsed)),
+    ]);
+  }
+
+  // 取得成功した区間を採用し、万が一失敗した区間はベース値でフォールバック
+  const sections = TRAFFIC_SECTIONS.map((sec) => {
+    if (resolvedMap[sec.id]) return resolvedMap[sec.id];
+    return buildSectionResult(sec, sec.baseDurationSec, sec.baseDurationSec);
   });
 
   return {
     isMock: false,
+    liveCount: Object.keys(resolvedMap).length,
+    errors: errors.length ? errors : undefined,
     checkedAt: new Date(now).toISOString(),
+    quota: { month: monthKey, routesUsed, matrixUsed, limit: MONTHLY_FREE_CAP_LIMIT },
     sections,
   };
 }
