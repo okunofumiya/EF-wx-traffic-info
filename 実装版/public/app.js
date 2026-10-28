@@ -1,4 +1,4 @@
-/* 気象・交通状況ダッシュボード v0.8.0-dev（気象：スナップショット対応／神鉄運行情報連携／道路交通情報（区間所要時間・路線図マップ対応）） */
+/* 気象・交通状況ダッシュボード v0.8.1-dev（気象：スナップショット対応／神鉄運行情報連携／道路交通情報（両方向表示・路線図マップ対応）） */
 (() => {
   const LV_ORDER = { emergency: 4, danger: 3, warning: 2, advisory: 1 };
   const LV_CLASS = ["none", "advisory", "warning", "danger", "emergency"];
@@ -7,7 +7,7 @@
   let model = null; // adaptSnapshot の結果
   let shintetsuStatus = null; // parseShintetsuStatus の結果
   let trafficData = null; // 道路交通情報
-  let trafficDirection = "south_east"; // "south_east" (南行・東行) | "north_west" (北行・西行)
+  let trafficDirection = "both"; // "both" (両方向) | "south_east" (南行・東行) | "north_west" (北行・西行)
   let trafficViewMode = "map"; // "map" | "list"
   let view = localStorage.getItem("view") || "all";
   let activeOnly = localStorage.getItem("activeOnly") === "1";
@@ -258,14 +258,15 @@
   // 道路交通情報（区間所要時間・路線図マップ）の描画
   function renderRoads() {
     const sections = trafficData?.sections || [];
-    const isNorthWest = trafficDirection === "north_west";
 
     // 方向切替ボタンのアクティブ状態
+    const btnBoth = $("#dir-both");
     const btnSe = $("#dir-se");
     const btnNw = $("#dir-nw");
-    if (btnSe && btnNw) {
-      btnSe.classList.toggle("active", !isNorthWest);
-      btnNw.classList.toggle("active", isNorthWest);
+    if (btnBoth && btnSe && btnNw) {
+      btnBoth.classList.toggle("active", trafficDirection === "both");
+      btnSe.classList.toggle("active", trafficDirection === "south_east");
+      btnNw.classList.toggle("active", trafficDirection === "north_west");
     }
 
     // 表示モード切替ボタンのアクティブ状態
@@ -296,41 +297,16 @@
     }
 
     if (trafficViewMode === "map") {
-      renderRoadMapSvg(sections, isNorthWest);
+      renderRoadMapSvg(sections, trafficDirection);
     } else {
-      renderRoadList(sections, isNorthWest);
+      renderRoadList(sections, trafficDirection);
     }
   }
 
-  // SVG路線図のレンダリング
-  function renderRoadMapSvg(sections, isNorthWest) {
+  // SVG路線図のレンダリング（両方向同時表示対応）
+  function renderRoadMapSvg(sections, direction) {
     const svg = $("#road-svg-map");
     if (!svg) return;
-
-    // 現在の進行方向に応じた区間マッピング
-    const activeSectionMap = isNorthWest
-      ? {
-          "r175-1": "r175-n-3", // 天神町 → 滝野社IC
-          "r175-2": "r175-n-2", // 田井西 → 天神町
-          "r175-3": "r175-n-1", // 森友 → 田井西
-          "hharima-1": "hharima-u-1", // 小野 → 加古川 (上り)
-          "bypass-1": "bypass-w-2", // 加古川中央 → 別所SA
-          "bypass-2": "bypass-w-1", // 明石西 → 加古川中央
-          "meiki-1": "meiki-w-3", // 坂井 → 中筋西
-          "meiki-2": "meiki-w-2", // 谷池 → 坂井
-          "meiki-3": "meiki-w-1", // 森友 → 谷池
-        }
-      : {
-          "r175-1": "r175-s-1", // 滝野社IC → 天神町
-          "r175-2": "r175-s-2", // 天神町 → 田井西
-          "r175-3": "r175-s-3", // 田井西 → 森友
-          "hharima-1": "hharima-d-1", // 加古川 → 小野 (下り)
-          "bypass-1": "bypass-e-1", // 別所SA → 加古川中央
-          "bypass-2": "bypass-e-2", // 加古川中央 → 明石西
-          "meiki-1": "meiki-e-1", // 中筋西 → 坂井
-          "meiki-2": "meiki-e-2", // 坂井 → 谷池
-          "meiki-3": "meiki-e-3", // 谷池 → 森友
-        };
 
     const secLookup = {};
     sections.forEach((s) => { secLookup[s.id] = s; });
@@ -344,48 +320,54 @@
     `;
 
     // 1. 接続線（高砂・別所接続の破線）
-    svgHtml += `<line x1="50" y1="285" x2="90" y2="375" class="svg-edge-path road-connector" />`;
+    svgHtml += `<line x1="50" y1="290" x2="90" y2="390" class="svg-edge-path road-connector" />`;
 
     // 2. 道路ライン（各区間）
-    const edgeCoords = {
-      "r175-1": { x1: 505, y1: 40, x2: 525, y2: 155, road: "r175", sw: 7 },
-      "r175-2": { x1: 525, y1: 155, x2: 550, y2: 265, road: "r175", sw: 7 },
-      "r175-3": { x1: 550, y1: 265, x2: 570, y2: 375, road: "r175", sw: 7 },
-      "hharima-1": { x1: 290, y1: 285, x2: 525, y2: 155, road: "higashiharima", sw: 7 },
-      "bypass-1": { x1: 50, y1: 285, x2: 290, y2: 285, road: "bypass", sw: 8 },
-      "bypass-2": { x1: 290, y1: 285, x2: 410, y2: 285, road: "bypass", sw: 8 },
-      "meiki-1": { x1: 90, y1: 375, x2: 250, y2: 375, road: "meiki", sw: 7 },
-      "meiki-2": { x1: 250, y1: 375, x2: 410, y2: 375, road: "meiki", sw: 7 },
-      "meiki-3": { x1: 410, y1: 375, x2: 570, y2: 375, road: "meiki", sw: 7 },
+    // 各ラインに属する区間の最大遅延ステータスを求めてハイライト
+    const getRoadStatus = (secIds) => {
+      const statuses = secIds.map((id) => secLookup[id]?.status || "normal");
+      if (statuses.includes("heavy")) return "status-heavy";
+      if (statuses.includes("crowded")) return "status-crowded";
+      return "status-normal";
     };
 
-    Object.entries(edgeCoords).forEach(([edgeKey, c]) => {
-      const secId = activeSectionMap[edgeKey];
-      const sec = secLookup[secId];
-      const statusCls = sec ? `status-${sec.status}` : "status-normal";
-      svgHtml += `<line x1="${c.x1}" y1="${c.y1}" x2="${c.x2}" y2="${c.y2}" stroke-width="${c.sw}" class="svg-edge-path road-${c.road} ${statusCls}" />`;
+    const edgeDefs = [
+      { id: "r175-1", x1: 505, y1: 45, x2: 525, y2: 160, road: "r175", sw: 7, secs: ["r175-s-1", "r175-n-3"] },
+      { id: "r175-2", x1: 525, y1: 160, x2: 550, y2: 275, road: "r175", sw: 7, secs: ["r175-s-2", "r175-n-2"] },
+      { id: "r175-3", x1: 550, y1: 275, x2: 570, y2: 390, road: "r175", sw: 7, secs: ["r175-s-3", "r175-n-1"] },
+      { id: "hharima-1", x1: 290, y1: 290, x2: 525, y2: 160, road: "higashiharima", sw: 7, secs: ["hharima-d-1", "hharima-u-1"] },
+      { id: "bypass-1", x1: 50, y1: 290, x2: 290, y2: 290, road: "bypass", sw: 8, secs: ["bypass-e-1", "bypass-w-2"] },
+      { id: "bypass-2", x1: 290, y1: 290, x2: 410, y2: 290, road: "bypass", sw: 8, secs: ["bypass-e-2", "bypass-w-1"] },
+      { id: "meiki-1", x1: 90, y1: 390, x2: 250, y2: 390, road: "meiki", sw: 7, secs: ["meiki-e-1", "meiki-w-3"] },
+      { id: "meiki-2", x1: 250, y1: 390, x2: 410, y2: 390, road: "meiki", sw: 7, secs: ["meiki-e-2", "meiki-w-2"] },
+      { id: "meiki-3", x1: 410, y1: 390, x2: 570, y2: 390, road: "meiki", sw: 7, secs: ["meiki-e-3", "meiki-w-1"] },
+    ];
+
+    edgeDefs.forEach((e) => {
+      const stCls = getRoadStatus(e.secs);
+      svgHtml += `<line x1="${e.x1}" y1="${e.y1}" x2="${e.x2}" y2="${e.y2}" stroke-width="${e.sw}" class="svg-edge-path road-${e.road} ${stCls}" />`;
     });
 
     // 3. 路線名タイトル
     svgHtml += `
-      <text x="540" y="30" class="svg-road-title road-r175">175号線</text>
-      <text x="350" y="200" class="svg-road-title road-higashiharima">東播磨道</text>
-      <text x="80" y="265" class="svg-road-title road-bypass">加古川・姫路バイパス</text>
-      <text x="280" y="420" class="svg-road-title road-meiki">明姫幹線</text>
+      <text x="535" y="30" class="svg-road-title road-r175">175号線</text>
+      <text x="330" y="210" class="svg-road-title road-higashiharima">東播磨道</text>
+      <text x="80" y="240" class="svg-road-title road-bypass">加古川・姫路バイパス</text>
+      <text x="280" y="455" class="svg-road-title road-meiki">明姫幹線</text>
     `;
 
     // 4. ノード（地点）
     const nodes = [
-      { id: "takino", x: 505, y: 40, label: "滝野社IC", sub: "加東市", lx: 440, ly: 44, ta: "end" },
-      { id: "tenjin", x: 525, y: 155, label: "天神町", sub: "小野市", lx: 542, ly: 159, ta: "start" },
-      { id: "tainishi", x: 550, y: 265, label: "田井西", sub: "三木市", lx: 567, ly: 269, ta: "start" },
-      { id: "moritomo", x: 570, y: 375, label: "森友", sub: "明石・神戸西", lx: 570, ly: 400, ta: "middle" },
-      { id: "chuo", x: 290, y: 285, label: "加古川中央", sub: "加古川市", lx: 290, ly: 270, ta: "middle" },
-      { id: "bessho", x: 50, y: 285, label: "別所SA", sub: "姫路市", lx: 50, ly: 270, ta: "middle" },
-      { id: "akashinishi", x: 410, y: 285, label: "明石西", sub: "播磨・明石", lx: 410, ly: 270, ta: "middle" },
-      { id: "nakasuji", x: 90, y: 375, label: "中筋西", sub: "高砂市", lx: 90, ly: 400, ta: "middle" },
-      { id: "sakai", x: 250, y: 375, label: "坂井", sub: "別府", lx: 250, ly: 400, ta: "middle" },
-      { id: "taniike", x: 410, y: 375, label: "谷池", sub: "播磨", lx: 410, ly: 400, ta: "middle" },
+      { id: "takino", x: 505, y: 45, label: "滝野社IC", sub: "加東市", lx: 440, ly: 49, ta: "end" },
+      { id: "tenjin", x: 525, y: 160, label: "天神町", sub: "小野市", lx: 535, ly: 155, ta: "start" },
+      { id: "tainishi", x: 550, y: 275, label: "田井西", sub: "三木市", lx: 560, ly: 270, ta: "start" },
+      { id: "moritomo", x: 570, y: 390, label: "森友", sub: "明石・神戸西", lx: 570, ly: 455, ta: "middle" },
+      { id: "chuo", x: 290, y: 290, label: "加古川中央", sub: "加古川市", lx: 290, ly: 240, ta: "middle" },
+      { id: "bessho", x: 50, y: 290, label: "別所SA", sub: "姫路市", lx: 50, ly: 240, ta: "middle" },
+      { id: "akashinishi", x: 410, y: 290, label: "明石西", sub: "播磨・明石", lx: 410, ly: 240, ta: "middle" },
+      { id: "nakasuji", x: 90, y: 390, label: "中筋西", sub: "高砂市", lx: 90, ly: 455, ta: "middle" },
+      { id: "sakai", x: 250, y: 390, label: "坂井", sub: "別府", lx: 250, ly: 455, ta: "middle" },
+      { id: "taniike", x: 410, y: 390, label: "谷池", sub: "播磨", lx: 410, ly: 455, ta: "middle" },
     ];
 
     nodes.forEach((n) => {
@@ -395,41 +377,60 @@
       `;
     });
 
-    // 5. 所要時間バッジ（各区間の中央）
-    const badgePositions = {
-      "r175-1": { x: 515, y: 95 },
-      "r175-2": { x: 537, y: 210 },
-      "r175-3": { x: 560, y: 320 },
-      "hharima-1": { x: 405, y: 220 },
-      "bypass-1": { x: 170, y: 285 },
-      "bypass-2": { x: 350, y: 285 },
-      "meiki-1": { x: 170, y: 375 },
-      "meiki-2": { x: 330, y: 375 },
-      "meiki-3": { x: 490, y: 375 },
+    // 5. 所要時間バッジ（全18区間・両方向レイアウト）
+    const SECTION_LAYOUT = {
+      // 175号線 (南行: 線の左側 / 北行: 線の右側)
+      "r175-s-1": { x: 468, y: 100, dir: "south_east", arrow: "▼", tag: "南" },
+      "r175-n-3": { x: 562, y: 100, dir: "north_west", arrow: "▲", tag: "北" },
+      "r175-s-2": { x: 488, y: 215, dir: "south_east", arrow: "▼", tag: "南" },
+      "r175-n-2": { x: 582, y: 215, dir: "north_west", arrow: "▲", tag: "北" },
+      "r175-s-3": { x: 508, y: 330, dir: "south_east", arrow: "▼", tag: "南" },
+      "r175-n-1": { x: 602, y: 330, dir: "north_west", arrow: "▲", tag: "北" },
+
+      // 東播磨道 (下り・小野方面: 線の上側 / 上り・加古川方面: 線の下側)
+      "hharima-d-1": { x: 395, y: 195, dir: "south_east", arrow: "↗", tag: "小野" },
+      "hharima-u-1": { x: 425, y: 250, dir: "north_west", arrow: "↙", tag: "加古" },
+
+      // 加古川・姫路バイパス (東行: 線の上側 / 西行: 線の下側)
+      "bypass-e-1": { x: 170, y: 260, dir: "south_east", arrow: "▶", tag: "東" },
+      "bypass-w-2": { x: 170, y: 320, dir: "north_west", arrow: "◀", tag: "西" },
+      "bypass-e-2": { x: 350, y: 260, dir: "south_east", arrow: "▶", tag: "東" },
+      "bypass-w-1": { x: 350, y: 320, dir: "north_west", arrow: "◀", tag: "西" },
+
+      // 明姫幹線 (東行: 線の上側 / 西行: 線の下側)
+      "meiki-e-1": { x: 170, y: 360, dir: "south_east", arrow: "▶", tag: "東" },
+      "meiki-w-3": { x: 170, y: 420, dir: "north_west", arrow: "◀", tag: "西" },
+      "meiki-e-2": { x: 330, y: 360, dir: "south_east", arrow: "▶", tag: "東" },
+      "meiki-w-2": { x: 330, y: 420, dir: "north_west", arrow: "◀", tag: "西" },
+      "meiki-e-3": { x: 490, y: 360, dir: "south_east", arrow: "▶", tag: "東" },
+      "meiki-w-1": { x: 490, y: 420, dir: "north_west", arrow: "◀", tag: "西" },
     };
 
-    Object.entries(badgePositions).forEach(([edgeKey, pos]) => {
-      const secId = activeSectionMap[edgeKey];
+    Object.entries(SECTION_LAYOUT).forEach(([secId, pos]) => {
+      // 進行方向フィルター
+      if (direction !== "both" && pos.dir !== direction) return;
+
       const sec = secLookup[secId];
       if (!sec) return;
 
-      const timeText = `${sec.durationInTrafficMin}分`;
       const hasDelay = sec.delayMin >= 2;
       const status = sec.status;
-      const bw = hasDelay ? 68 : 54;
-      const bh = 26;
+      const bw = hasDelay ? 66 : 56;
+      const bh = 24;
       const bx = pos.x - bw / 2;
       const by = pos.y - bh / 2;
 
       svgHtml += `
         <g class="svg-badge-group" data-road-id="${sec.id}" transform-origin="${pos.x} ${pos.y}">
           <rect x="${bx}" y="${by}" width="${bw}" height="${bh}" class="svg-badge-rect status-${status}" filter="url(#badge-shadow)" />
-          <text x="${hasDelay ? pos.x - 10 : pos.x}" y="${pos.y + 1}" class="svg-badge-text-time status-${status}">${timeText}</text>
+          <text x="${hasDelay ? pos.x - 9 : pos.x}" y="${pos.y + 1}" class="svg-badge-text-time status-${status}">
+            <tspan fill="#64748b" font-size="10" font-weight="700">${pos.arrow}${pos.tag}</tspan> ${sec.durationInTrafficMin}分
+          </text>
           ${
             hasDelay
               ? `
-              <rect x="${bx + bw - 22}" y="${by + 3}" width="18" height="13" class="svg-badge-delay-pill status-${status}" />
-              <text x="${bx + bw - 13}" y="${by + 10.5}" class="svg-badge-delay-text">+${sec.delayMin}</text>
+              <rect x="${bx + bw - 20}" y="${by + 3}" width="17" height="12" class="svg-badge-delay-pill status-${status}" />
+              <text x="${bx + bw - 11.5}" y="${by + 9.5}" class="svg-badge-delay-text">+${sec.delayMin}</text>
             `
               : ""
           }
@@ -450,13 +451,14 @@
   }
 
   // 区間リストのレンダリング
-  function renderRoadList(sections, isNorthWest) {
+  function renderRoadList(sections, direction) {
     const listCard = $("#road-list-card");
     if (!listCard) return;
 
     // 方向フィルタ
     const filtered = sections.filter((s) => {
-      if (isNorthWest) return s.direction === "north" || s.direction === "west" || s.direction === "up";
+      if (direction === "both") return true;
+      if (direction === "north_west") return s.direction === "north" || s.direction === "west" || s.direction === "up";
       return s.direction === "south" || s.direction === "east" || s.direction === "down";
     });
 
@@ -745,6 +747,10 @@
   });
 
   // 道路：進行方向切替
+  $("#dir-both")?.addEventListener("click", () => {
+    trafficDirection = "both";
+    renderRoads();
+  });
   $("#dir-se")?.addEventListener("click", () => {
     trafficDirection = "south_east";
     renderRoads();

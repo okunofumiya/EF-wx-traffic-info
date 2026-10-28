@@ -100,7 +100,10 @@
       <!-- 操作バー：方向切り替え＆表示形式（マップ / リスト）切り替え -->
       <div class="road-controls">
         <div class="road-dir-switch" role="tablist" aria-label="進行方向">
-          <button class="road-dir-btn active" data-dir="south_east" id="dir-se">
+          <button class="road-dir-btn active" data-dir="both" id="dir-both">
+            <span>🔄</span> 両方向
+          </button>
+          <button class="road-dir-btn" data-dir="south_east" id="dir-se">
             <span>▼</span> 南行・東行<small>（明石方面）</small>
           </button>
           <button class="road-dir-btn" data-dir="north_west" id="dir-nw">
@@ -124,7 +127,7 @@
       <!-- 路線図マップコンテナ (SVG) -->
       <div id="road-map-card" class="card road-map-card">
         <div class="road-map-wrapper">
-          <svg id="road-svg-map" viewBox="0 0 640 440" preserveAspectRatio="xMidYMid meet" aria-label="道路路線図"></svg>
+          <svg id="road-svg-map" viewBox="0 0 660 470" preserveAspectRatio="xMidYMid meet" aria-label="道路路線図"></svg>
         </div>
         <p class="note map-hint">※ 区間をタップするとGoogleマップのルート案内や詳細が開きます</p>
       </div>
@@ -162,7 +165,7 @@
       <p>気象情報：気象庁の公開データをもとに作成しています。</p>
       <p>詳しい天気は各市町の「天気」リンク（Yahoo!天気）から確認できます。</p>
       <p>交通情報：神戸電鉄の運行有無、主要幹線道路の区間所要時間に対応しています。</p>
-      <p class="ver">v0.8.0-dev</p>
+      <p class="ver">v0.8.1-dev</p>
     </footer>
   </main>
 
