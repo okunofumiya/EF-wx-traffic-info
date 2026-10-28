@@ -172,30 +172,17 @@
           <span class="road-source-tag" id="road-source-badge"></span>
         </div>
 
-        <!-- 操作バー：方向切り替え＆表示形式（マップ / リスト）切り替え -->
+        <!-- 操作バー：凡例 ＆ 表示形式（マップ / リスト）切り替え -->
         <div class="road-controls">
-          <div class="road-dir-switch" role="tablist" aria-label="進行方向">
-            <button class="road-dir-btn active" data-dir="both" id="dir-both">
-              <span>🔄</span> 両方向
-            </button>
-            <button class="road-dir-btn" data-dir="south_east" id="dir-se">
-              <span>▼</span> 南行・東行<small>（明石方面）</small>
-            </button>
-            <button class="road-dir-btn" data-dir="north_west" id="dir-nw">
-              <span>▲</span> 北行・西行<small>（社・姫路方面）</small>
-            </button>
+          <div class="legend road-legend" style="margin-bottom:0">
+            <span class="lg-road lg-road-normal">🟢 順調</span>
+            <span class="lg-road lg-road-crowded">🟡 混雑（+3分〜）</span>
+            <span class="lg-road lg-road-heavy">🔴 渋滞（+8分〜）</span>
           </div>
           <div class="road-view-switch" role="tablist" aria-label="表示形式">
             <button class="road-vbtn active" data-mode="map" id="mode-map">🗺 路線図</button>
             <button class="road-vbtn" data-mode="list" id="mode-list">📋 リスト</button>
           </div>
-        </div>
-
-        <!-- 凡例 -->
-        <div class="legend road-legend">
-          <span class="lg-road lg-road-normal">🟢 順調</span>
-          <span class="lg-road lg-road-crowded">🟡 混雑（+3分〜）</span>
-          <span class="lg-road lg-road-heavy">🔴 渋滞（+8分〜）</span>
         </div>
 
         <!-- 路線図マップコンテナ (SVG) -->
@@ -215,7 +202,7 @@
       <p>気象情報：気象庁の公開データをもとに作成しています。</p>
       <p>詳しい天気は各市町の「天気」リンク（Yahoo!天気）から確認できます。</p>
       <p>交通情報：神戸電鉄の運行有無、主要幹線道路の区間所要時間に対応しています。</p>
-      <p class="ver">v0.9.4-dev</p>
+      <p class="ver">v0.9.6-dev</p>
     </footer>
   </main>
 

@@ -1,4 +1,4 @@
-/* 気象・交通状況ダッシュボード v0.9.4-dev（4ページタブ切替対応／気象：スナップショット対応／神鉄運行情報連携／道路交通情報対応） */
+/* 気象・交通状況ダッシュボード v0.9.6-dev（4ページタブ切替対応／気象：スナップショット対応／神鉄運行情報連携／道路交通情報対応） */
 (() => {
   const LV_ORDER = { emergency: 4, danger: 3, warning: 2, advisory: 1 };
   const LV_CLASS = ["none", "advisory", "warning", "danger", "emergency"];
@@ -323,16 +323,16 @@
         const st = lSecs.some((s) => s.status === "heavy")
           ? "heavy"
           : lSecs.some((s) => s.status === "crowded")
-          ? "crowded"
-          : "normal";
+            ? "crowded"
+            : "normal";
         const stLabel =
           st === "heavy"
             ? `🔴 渋滞 +${maxD}分`
             : st === "crowded"
-            ? `🟡 混雑 +${maxD}分`
-            : maxD >= 2
-            ? `🟢 順調 (+${maxD}分)`
-            : "🟢 順調";
+              ? `🟡 混雑 +${maxD}分`
+              : maxD >= 2
+                ? `🟢 順調 (+${maxD}分)`
+                : "🟢 順調";
         return `
           <div class="sc-road-cell status-${st}">
             <span class="sc-road-name"><i class="sc-train-dot" style="background:${rl.color}"></i>${esc(shortRoadName[rl.id] || rl.name)}</span>
@@ -673,7 +673,7 @@
     // 3. 路線名タイトル
     svgHtml += `
       <text x="535" y="28" class="svg-road-title road-r175">175号線</text>
-      <text x="325" y="285" class="svg-road-title road-higashiharima">東播磨道</text>
+      <text x="312" y="275" class="svg-road-title road-higashiharima">東播磨道</text>
       <text x="75" y="325" class="svg-road-title road-bypass">加古川・姫路バイパス</text>
       <text x="280" y="590" class="svg-road-title road-meiki">明姫幹線</text>
     `;
@@ -702,30 +702,30 @@
     // 5. 所要時間バッジ（全18区間・両方向レイアウト）
     const SECTION_LAYOUT = {
       // 175号線 (南行: 線の左側 / 北行: 線の右側)
-      "r175-s-1": { x: 462, y: 122, dir: "south_east", arrow: "▼", tag: "南" },
-      "r175-n-3": { x: 568, y: 122, dir: "north_west", arrow: "▲", tag: "北" },
-      "r175-s-2": { x: 486, y: 280, dir: "south_east", arrow: "▼", tag: "南" },
-      "r175-n-2": { x: 592, y: 280, dir: "north_west", arrow: "▲", tag: "北" },
-      "r175-s-3": { x: 508, y: 440, dir: "south_east", arrow: "▼", tag: "南" },
-      "r175-n-1": { x: 612, y: 440, dir: "north_west", arrow: "▲", tag: "北" },
+      "r175-s-1": { x: 553, y: 122, dir: "south_east", arrow: "↓", tag: "南" },
+      "r175-n-3": { x: 477, y: 122, dir: "north_west", arrow: "↑", tag: "北" },
+      "r175-s-2": { x: 576, y: 280, dir: "south_east", arrow: "↓", tag: "南" },
+      "r175-n-2": { x: 499, y: 280, dir: "north_west", arrow: "↑", tag: "北" },
+      "r175-s-3": { x: 598, y: 440, dir: "south_east", arrow: "↓", tag: "南" },
+      "r175-n-1": { x: 522, y: 440, dir: "north_west", arrow: "↑", tag: "北" },
 
       // 東播磨道 (下り・小野方面: 線の上側 / 上り・加古川方面: 線の下側)
-      "hharima-d-1": { x: 390, y: 265, dir: "south_east", arrow: "↗", tag: "小野" },
-      "hharima-u-1": { x: 430, y: 320, dir: "north_west", arrow: "↙", tag: "加古" },
+      "hharima-d-1": { x: 394, y: 278, dir: "south_east", arrow: "↗", tag: "小野" },
+      "hharima-u-1": { x: 424, y: 303, dir: "north_west", arrow: "↙", tag: "加古" },
 
       // 加古川・姫路バイパス (東行: 線の上側 / 西行: 線の下側)
-      "bypass-e-1": { x: 170, y: 350, dir: "south_east", arrow: "▶", tag: "東" },
-      "bypass-w-2": { x: 170, y: 412, dir: "north_west", arrow: "◀", tag: "西" },
-      "bypass-e-2": { x: 350, y: 350, dir: "south_east", arrow: "▶", tag: "東" },
-      "bypass-w-1": { x: 350, y: 412, dir: "north_west", arrow: "◀", tag: "西" },
+      "bypass-e-1": { x: 170, y: 359, dir: "south_east", arrow: "→", tag: "東" },
+      "bypass-w-2": { x: 170, y: 401, dir: "north_west", arrow: "←", tag: "西" },
+      "bypass-e-2": { x: 350, y: 359, dir: "south_east", arrow: "→", tag: "東" },
+      "bypass-w-1": { x: 350, y: 401, dir: "north_west", arrow: "←", tag: "西" },
 
       // 明姫幹線 (東行: 線の上側 / 西行: 線の下側)
-      "meiki-e-1": { x: 170, y: 490, dir: "south_east", arrow: "▶", tag: "東" },
-      "meiki-w-3": { x: 170, y: 552, dir: "north_west", arrow: "◀", tag: "西" },
-      "meiki-e-2": { x: 330, y: 490, dir: "south_east", arrow: "▶", tag: "東" },
-      "meiki-w-2": { x: 330, y: 552, dir: "north_west", arrow: "◀", tag: "西" },
-      "meiki-e-3": { x: 490, y: 490, dir: "south_east", arrow: "▶", tag: "東" },
-      "meiki-w-1": { x: 490, y: 552, dir: "north_west", arrow: "◀", tag: "西" },
+      "meiki-e-1": { x: 170, y: 499, dir: "south_east", arrow: "→", tag: "東" },
+      "meiki-w-3": { x: 170, y: 541, dir: "north_west", arrow: "←", tag: "西" },
+      "meiki-e-2": { x: 330, y: 499, dir: "south_east", arrow: "→", tag: "東" },
+      "meiki-w-2": { x: 330, y: 541, dir: "north_west", arrow: "←", tag: "西" },
+      "meiki-e-3": { x: 490, y: 499, dir: "south_east", arrow: "→", tag: "東" },
+      "meiki-w-1": { x: 490, y: 541, dir: "north_west", arrow: "←", tag: "西" },
     };
 
     Object.entries(SECTION_LAYOUT).forEach(([secId, pos]) => {
