@@ -1,4 +1,4 @@
-/* 気象・交通状況ダッシュボード v0.9.1-dev（4ページタブ切替対応／気象：スナップショット対応／神鉄運行情報連携／道路交通情報対応） */
+/* 気象・交通状況ダッシュボード v0.9.2-dev（4ページタブ切替対応／気象：スナップショット対応／神鉄運行情報連携／道路交通情報対応） */
 (() => {
   const LV_ORDER = { emergency: 4, danger: 3, warning: 2, advisory: 1 };
   const LV_CLASS = ["none", "advisory", "warning", "danger", "emergency"];
@@ -450,16 +450,16 @@
 
     // 4. ノード（地点）
     const nodes = [
-      { id: "takino", x: 505, y: 45, label: "滝野社IC", sub: "加東市", lx: 440, ly: 49, ta: "end" },
+      { id: "takino", x: 505, y: 45, label: "滝野社IC", sub: "加東市", lx: 492, ly: 49, ta: "end" },
       { id: "tenjin", x: 525, y: 200, label: "天神町", sub: "小野市", lx: 538, ly: 195, ta: "start" },
       { id: "tainishi", x: 550, y: 360, label: "田井西", sub: "三木市", lx: 563, ly: 355, ta: "start" },
-      { id: "moritomo", x: 570, y: 520, label: "森友", sub: "明石・神戸西", lx: 570, ly: 590, ta: "middle" },
-      { id: "chuo", x: 290, y: 380, label: "加古川中央", sub: "加古川市", lx: 290, ly: 325, ta: "middle" },
-      { id: "bessho", x: 50, y: 380, label: "別所SA", sub: "姫路市", lx: 50, ly: 325, ta: "middle" },
-      { id: "akashinishi", x: 410, y: 380, label: "明石西", sub: "播磨・明石", lx: 410, ly: 325, ta: "middle" },
-      { id: "nakasuji", x: 90, y: 520, label: "中筋西", sub: "高砂市", lx: 90, ly: 590, ta: "middle" },
-      { id: "sakai", x: 250, y: 520, label: "坂井", sub: "別府", lx: 250, ly: 590, ta: "middle" },
-      { id: "taniike", x: 410, y: 520, label: "谷池", sub: "播磨", lx: 410, ly: 590, ta: "middle" },
+      { id: "moritomo", x: 570, y: 520, label: "森友", sub: "明石・神戸西", lx: 570, ly: 542, ta: "middle" },
+      { id: "chuo", x: 290, y: 380, label: "加古川中央", sub: "加古川市", lx: 280, ly: 363, ta: "middle" },
+      { id: "bessho", x: 50, y: 380, label: "別所SA", sub: "姫路市", lx: 50, ly: 363, ta: "middle" },
+      { id: "akashinishi", x: 410, y: 380, label: "明石西", sub: "播磨・明石", lx: 410, ly: 363, ta: "middle" },
+      { id: "nakasuji", x: 90, y: 520, label: "中筋西", sub: "高砂市", lx: 90, ly: 542, ta: "middle" },
+      { id: "sakai", x: 250, y: 520, label: "坂井", sub: "別府", lx: 250, ly: 542, ta: "middle" },
+      { id: "taniike", x: 410, y: 520, label: "谷池", sub: "播磨", lx: 410, ly: 542, ta: "middle" },
     ];
 
     nodes.forEach((n) => {
@@ -518,14 +518,13 @@
           <text x="${hasDelay ? pos.x - 9 : pos.x}" y="${pos.y + 1}" class="svg-badge-text-time status-${status}">
             <tspan fill="#64748b" font-size="10" font-weight="700">${pos.arrow}${pos.tag}</tspan> ${sec.durationInTrafficMin}分
           </text>
-          ${
-            hasDelay
-              ? `
+          ${hasDelay
+          ? `
               <rect x="${bx + bw - 20}" y="${by + 3}" width="17" height="12" class="svg-badge-delay-pill status-${status}" />
               <text x="${bx + bw - 11.5}" y="${by + 9.5}" class="svg-badge-delay-text">+${sec.delayMin}</text>
             `
-              : ""
-          }
+          : ""
+        }
         </g>
       `;
     });
@@ -587,14 +586,14 @@
           </div>
           <div class="road-items">
             ${items
-              .map((s) => {
-                const statusBadge =
-                  s.status === "heavy"
-                    ? '<span class="road-delay-badge status-heavy">渋滞</span>'
-                    : s.status === "crowded"
-                    ? `<span class="road-delay-badge status-crowded">+${s.delayMin}分遅れ</span>`
-                    : "";
-                return `
+          .map((s) => {
+            const statusBadge =
+              s.status === "heavy"
+                ? '<span class="road-delay-badge status-heavy">渋滞</span>'
+                : s.status === "crowded"
+                  ? `<span class="road-delay-badge status-crowded">+${s.delayMin}分遅れ</span>`
+                  : "";
+            return `
                 <div class="road-item" data-road-id="${s.id}">
                   <div class="road-item-left">
                     <span class="road-item-name">${esc(s.name)}</span>
@@ -608,8 +607,8 @@
                     <span class="road-item-arrow">›</span>
                   </div>
                 </div>`;
-              })
-              .join("")}
+          })
+          .join("")}
           </div>
         </div>
       `;
