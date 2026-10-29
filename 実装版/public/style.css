@@ -491,3 +491,257 @@ body.mine .count-pill { color: #4a3200; background: #ffe27a; border-color: #f2b2
 .road-source-tag { margin-left: auto; font-size: 11px; font-weight: 700; color: var(--muted); }
 
 
+
+/* --- マイ通勤ルート（自宅 ⇄ 職場 Googleマップ連携・localStorage） --- */
+.commute-card {
+  padding: 15px 16px;
+  margin-bottom: 14px;
+  border-left: 5px solid var(--accent);
+}
+.commute-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.commute-title-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.commute-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 11px;
+  background: var(--surface-2);
+  display: grid;
+  place-items: center;
+  font-size: 19px;
+  flex-shrink: 0;
+}
+.commute-title {
+  font-size: 15px;
+  font-weight: 900;
+  color: var(--text);
+  margin: 0;
+}
+.commute-sub {
+  font-size: 11.5px;
+  color: var(--muted);
+  margin: 2px 0 0;
+}
+.commute-edit-btn {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 5px 11px;
+  font-size: 11.5px;
+  font-weight: 800;
+  color: var(--text);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.commute-edit-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.commute-route-summary {
+  background: var(--surface-2);
+  border-radius: 10px;
+  padding: 8px 12px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.commute-route-tag {
+  background: #ffffff;
+  border: 1px solid var(--border);
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-weight: 800;
+}
+.commute-actions {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+@media (max-width: 560px) {
+  .commute-actions {
+    grid-template-columns: 1fr;
+  }
+}
+.commute-go-btn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 13px;
+  border-radius: 12px;
+  text-decoration: none;
+  border: 1.5px solid var(--border);
+  background: #ffffff;
+  transition: transform 0.12s ease, box-shadow 0.12s ease, border-color 0.12s ease;
+}
+.commute-go-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(24, 110, 110, 0.12);
+}
+.commute-go-btn.to-work {
+  border-color: #93c5fd;
+  background: linear-gradient(135deg, #eff6ff 0%, #ffffff 100%);
+}
+.commute-go-btn.to-home {
+  border-color: #6ee7b7;
+  background: linear-gradient(135deg, #ecfdf5 0%, #ffffff 100%);
+}
+.cg-icon {
+  font-size: 22px;
+  flex-shrink: 0;
+}
+.cg-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.cg-text b {
+  font-size: 13.5px;
+  font-weight: 900;
+  color: var(--text);
+}
+.cg-text small {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--accent);
+}
+.commute-form {
+  display: grid;
+  gap: 10px;
+  margin-top: 6px;
+}
+.commute-field {
+  display: grid;
+  gap: 4px;
+}
+.commute-field label {
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.commute-field .req {
+  font-size: 10px;
+  background: var(--warning-soft);
+  color: #ad2b20;
+  padding: 1px 6px;
+  border-radius: 999px;
+}
+.commute-input-row {
+  display: flex;
+  gap: 6px;
+}
+.commute-field input {
+  flex: 1;
+  width: 100%;
+  padding: 8px 11px;
+  font-size: 13px;
+  border: 1.5px solid var(--border);
+  border-radius: 10px;
+  background: #ffffff;
+  color: var(--text);
+  font-family: inherit;
+}
+.commute-field input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+.commute-geo-btn {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0 10px;
+  font-size: 11.5px;
+  font-weight: 800;
+  color: var(--text);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.commute-geo-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.commute-form-btns {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 2px;
+}
+.commute-save-btn {
+  background: var(--accent);
+  color: #ffffff;
+  border: none;
+  border-radius: 10px;
+  padding: 9px 16px;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+}
+.commute-cancel-btn,
+.commute-clear-btn {
+  background: var(--surface-2);
+  color: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 8px 12px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.commute-clear-btn {
+  color: #b3453c;
+  margin-left: auto;
+}
+.commute-privacy-note {
+  font-size: 11px;
+  color: var(--muted);
+  margin: 2px 0 0;
+  line-height: 1.5;
+}
+.sc-commute-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  background: #f0f9ff;
+  border: 1px solid #bae6fd;
+  border-radius: 11px;
+  padding: 7px 10px;
+  font-size: 11.5px;
+}
+.sc-commute-label {
+  font-weight: 800;
+  color: var(--text);
+}
+.sc-commute-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  background: #ffffff;
+  border: 1px solid #93c5fd;
+  color: #1d4ed8;
+  font-weight: 800;
+  padding: 3px 9px;
+  border-radius: 999px;
+  text-decoration: none;
+  font-size: 11px;
+}
+.sc-commute-link:hover {
+  background: #dbeafe;
+}

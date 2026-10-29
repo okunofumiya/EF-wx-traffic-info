@@ -172,6 +172,71 @@
           <span class="road-source-tag" id="road-source-badge"></span>
         </div>
 
+        <!-- マイ通勤ルート（自宅 ⇄ 職場 Googleマップ直行・localStorage保存） -->
+        <div class="card commute-card" id="commute-card">
+          <div class="commute-head">
+            <div class="commute-title-group">
+              <span class="commute-icon">🏠</span>
+              <div>
+                <h3 class="commute-title">マイ通勤ルート（Googleマップ）</h3>
+                <p class="commute-sub">自宅と職場を登録すると、行き帰りの混雑・所要時間をすぐ確認できます</p>
+              </div>
+            </div>
+            <button type="button" class="commute-edit-btn" id="commute-edit-btn" hidden>⚙️ 設定変更</button>
+          </div>
+
+          <!-- 登録済み表示ビュー -->
+          <div id="commute-saved-view" class="commute-saved" hidden>
+            <div class="commute-route-summary" id="commute-route-summary"></div>
+            <div class="commute-actions">
+              <a id="commute-btn-to-work" href="#" target="_blank" rel="noopener noreferrer" class="commute-go-btn to-work">
+                <span class="cg-icon">🏢</span>
+                <span class="cg-text">
+                  <b>行き（自宅 → 職場）</b>
+                  <small>現在の渋滞・所要時間をGoogleマップで開く ↗</small>
+                </span>
+              </a>
+              <a id="commute-btn-to-home" href="#" target="_blank" rel="noopener noreferrer" class="commute-go-btn to-home">
+                <span class="cg-icon">🏠</span>
+                <span class="cg-text">
+                  <b>帰り（職場 → 自宅）</b>
+                  <small>現在の渋滞・所要時間をGoogleマップで開く ↗</small>
+                </span>
+              </a>
+            </div>
+          </div>
+
+          <!-- 登録・編集フォームビュー -->
+          <form id="commute-form" class="commute-form" hidden>
+            <div class="commute-field">
+              <label for="commute-home">🏠 自宅（出発地）<span class="req">必須</span></label>
+              <div class="commute-input-row">
+                <input type="text" id="commute-home" placeholder="例：加古川市加古川町、〇〇駅、〇〇交差点 など" required />
+                <button type="button" class="commute-geo-btn" id="commute-geo-home" title="現在地を入力">📍現在地</button>
+              </div>
+            </div>
+            <div class="commute-field">
+              <label for="commute-work">🏢 職場（目的地）<span class="req">必須</span></label>
+              <div class="commute-input-row">
+                <input type="text" id="commute-work" placeholder="例：小野市〇〇町、職場名、住所 など" required />
+                <button type="button" class="commute-geo-btn" id="commute-geo-work" title="現在地を入力">📍現在地</button>
+              </div>
+            </div>
+            <div class="commute-field">
+              <label for="commute-via">🛣 経由地（任意・いつも通るICや交差点があれば）</label>
+              <input type="text" id="commute-via" placeholder="例：加古川中央JCT、天神町交差点 など（空欄でもOK）" />
+            </div>
+            <div class="commute-form-btns">
+              <button type="submit" class="commute-save-btn">💾 この端末に保存する</button>
+              <button type="button" class="commute-cancel-btn" id="commute-cancel-btn" hidden>キャンセル</button>
+              <button type="button" class="commute-clear-btn" id="commute-clear-btn" hidden>🗑 登録解除</button>
+            </div>
+            <p class="commute-privacy-note">
+              🔒 入力内容はあなたの端末（ブラウザのlocalStorage）内にのみ保存され、外部や他の職員には一切共有されません。
+            </p>
+          </form>
+        </div>
+
         <!-- 操作バー：凡例 ＆ 表示形式（マップ / リスト）切り替え -->
         <div class="road-controls">
           <div class="legend road-legend" style="margin-bottom:0">
@@ -202,7 +267,7 @@
       <p>気象情報：気象庁の公開データをもとに作成しています。</p>
       <p>詳しい天気は各市町の「天気」リンク（Yahoo!天気）から確認できます。</p>
       <p>交通情報：鉄道4路線（JR神戸線・JR加古川線・神戸電鉄・山陽電車）の運行有無、主要幹線道路の区間所要時間に対応しています。</p>
-      <p class="ver">v0.10.0-dev</p>
+      <p class="ver">v0.11.0-dev</p>
     </footer>
   </main>
 
