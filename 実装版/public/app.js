@@ -1,4 +1,4 @@
-/* 気象・交通状況ダッシュボード v0.9.6-dev（4ページタブ切替対応／気象：スナップショット対応／神鉄運行情報連携／道路交通情報対応） */
+/* 気象・交通状況ダッシュボード v0.10.0-dev（4ページタブ切替対応／気象：スナップショット対応／鉄道4路線運行情報連携／道路交通情報対応） */
 (() => {
   const LV_ORDER = { emergency: 4, danger: 3, warning: 2, advisory: 1 };
   const LV_CLASS = ["none", "advisory", "warning", "danger", "emergency"];
@@ -7,6 +7,7 @@
   let activePage = "summary"; // "summary" | "weather" | "trains" | "roads"
   let model = null; // adaptSnapshot の結果
   let shintetsuStatus = null; // parseShintetsuStatus の結果
+  let railData = null; // 4路線統合運行情報 (/api/rail)
   let trafficData = null; // 道路交通情報
   let trafficDirection = "both"; // "both" (両方向) | "south_east" (南行・東行) | "north_west" (北行・西行)
   let trafficViewMode = "map"; // "map" | "list"
@@ -29,10 +30,14 @@
   const visibleAreas = () => allAreas().filter((a) => !mine() || pins.has(a));
 
   const getLineStatus = (lineId) => {
-    if (lineId === "shintetsu" || lineId.startsWith("shintetsu-")) {
-      return shintetsuStatus || { status: "na", label: "確認中", cls: "status-na", hasAlert: false, text: "運行情報は公式HPでご確認ください" };
+    const normalizedId = lineId.startsWith("shintetsu-") ? "shintetsu" : lineId;
+    if (railData && railData.lines && railData.lines[normalizedId]) {
+      return parseRailLineStatus(railData.lines[normalizedId], normalizedId);
     }
-    return { status: "na", label: "準備中", cls: "status-na", hasAlert: false, text: "" };
+    if (normalizedId === "shintetsu" && shintetsuStatus) {
+      return shintetsuStatus;
+    }
+    return parseRailLineStatus(null, normalizedId);
   };
 
   const visibleLines = () =>
@@ -95,7 +100,9 @@
 
     // 鉄道の運行影響路線数をカウント（表示対象のスコープ内）
     const trainScope = TRAIN_LINES.filter((l) => !mine() || linePins.has(l.id));
-    const trainAlertCount = trainScope.filter((l) => getLineStatus(l.id).hasAlert).length;
+    const trainAlertLines = trainScope.filter((l) => getLineStatus(l.id).hasAlert);
+    const trainAlertCount = trainAlertLines.length;
+    const trainAlertNames = trainAlertLines.map((l) => l.name).join("・");
 
     // 道路の遅延区間数をカウント（遅延3分以上）
     const roadSections = trafficData?.sections || [];
@@ -104,9 +111,9 @@
 
     let trafficNote = "";
     if (trainAlertCount > 0 && roadDelayCount > 0) {
-      trafficNote = `神戸電鉄で運行情報、道路で${roadDelayCount}区間に遅れが出ています。`;
+      trafficNote = `${trainAlertNames}で運行情報、道路で${roadDelayCount}区間に遅れが出ています。`;
     } else if (trainAlertCount > 0) {
-      trafficNote = "神戸電鉄で運行情報が出ています。公式ページをご確認ください。";
+      trafficNote = `${trainAlertNames}で運行情報が出ています。運行情報ページをご確認ください。`;
     } else if (roadDelayCount > 0) {
       const heavy = roadDelayed.filter((s) => s.status === "heavy");
       if (heavy.length > 0) {
@@ -241,43 +248,44 @@
       `;
     }
 
-    // 2. 電車の運行状況サマリーカード
+    // 2. 電車の運行状況サマリーカード（4路線すべてリアルタイム反映）
     const tCard = $("#sc-card-train");
     const tBadge = $("#sc-train-badge");
     const tBody = $("#sc-train-body");
     if (tCard && tBadge && tBody) {
-      const shinSt = getLineStatus("shintetsu");
-      if (shinSt.hasAlert) {
+      const scopedLines = TRAIN_LINES.filter((l) => !mine() || linePins.has(l.id));
+      const displayLines = scopedLines.length > 0 ? scopedLines : TRAIN_LINES;
+      const lineStates = displayLines.map((l) => ({ line: l, st: getLineStatus(l.id) }));
+      const alertLines = lineStates.filter((x) => x.st.hasAlert);
+      const okLines = lineStates.filter((x) => x.st.status === "ok");
+
+      if (alertLines.length > 0) {
         tCard.dataset.status = "alert";
         tBadge.className = "sc-badge status-alert";
-        tBadge.textContent = "運行情報あり";
-      } else if (shinSt.status === "ok") {
+        tBadge.textContent = `運行情報 ${alertLines.length}路線`;
+      } else if (okLines.length > 0) {
         tCard.dataset.status = "ok";
         tBadge.className = "sc-badge status-ok";
         tBadge.textContent = "平常運転";
       } else {
         tCard.dataset.status = "ok";
         tBadge.className = "sc-badge status-na";
-        tBadge.textContent = shinSt.label;
+        tBadge.textContent = "確認中";
       }
-
-      const trainLines = TRAIN_LINES.filter((l) => !mine() || linePins.has(l.id));
-      const otherLines = trainLines.filter((l) => l.id !== "shintetsu");
-      const otherNames = otherLines.length ? otherLines.map((l) => l.name).join("・") : "JR神戸線・JR加古川線・山陽電車";
 
       tBody.innerHTML = `
         <div class="sc-train-list">
-          <div class="sc-train-row ${shinSt.hasAlert ? "is-alert" : ""}">
-            <span class="sc-train-dot" style="background:#f97316"></span>
-            <span class="sc-train-name">神戸電鉄 全線</span>
-            <span class="sc-train-sub">${esc(shinSt.text || "粟生線・有馬線・三田線など")}</span>
-            <span class="sc-train-st ${shinSt.hasAlert ? "alert" : "ok"}">${esc(shinSt.label)}</span>
-          </div>
-          <div class="sc-train-row">
-            <span class="sc-train-dot" style="background:#1e6fd9"></span>
-            <span class="sc-train-name">${esc(otherNames)}</span>
-            <span class="sc-train-st link">各社公式情報 ›</span>
-          </div>
+          ${lineStates
+            .map(
+              ({ line, st }) => `
+            <div class="sc-train-row ${st.hasAlert ? "is-alert" : ""}">
+              <span class="sc-train-dot" style="background:${line.color}"></span>
+              <span class="sc-train-name">${esc(line.name)}</span>
+              <span class="sc-train-sub">${esc(st.hasAlert ? "遅延・運転見合わせ等の情報あり" : line.section)}</span>
+              <span class="sc-train-st ${st.hasAlert ? "alert" : st.status === "ok" ? "ok" : "link"}">${esc(st.label)}</span>
+            </div>`
+            )
+            .join("")}
         </div>
       `;
     }
@@ -548,10 +556,9 @@
       return;
     }
     $("#train-list").innerHTML =
-      '<p class="note train-note">※ 神戸電鉄は公式ページの運行有無を自動反映しています（JR・山陽は準備中）。詳細・最新状況は各社の公式ページをご確認ください。</p>' +
+      '<p class="note train-note">※ 4路線（JR神戸線・JR加古川線・神戸電鉄・山陽電車）すべての運行情報の有無を自動反映しています。詳細・最新状況は各運行情報ページをご確認ください。</p>' +
       scope.map((l, i) => {
         const st = getLineStatus(l.id);
-        const isShintetsu = l.id === "shintetsu" || l.id.startsWith("shintetsu-");
         return `
         <article class="card train ${st.hasAlert ? "train-alert" : ""}" id="train-${l.id}" style="--line:${l.color};animation-delay:${i * 60}ms">
           <span class="train-color"></span>
@@ -566,8 +573,8 @@
                 <span class="status ${st.cls}">${st.label}</span>
               </div>
             </div>
-            ${isShintetsu && st.text ? `<p class="train-msg ${st.hasAlert ? "alert" : ""}">${esc(st.text)}</p>` : ""}
-            <a class="train-link" href="${l.url}" target="_blank" rel="noopener">公式の運行情報を見る ↗</a>
+            ${st.text ? `<p class="train-msg ${st.hasAlert ? "alert" : ""}">${esc(st.text)}</p>` : ""}
+            <a class="train-link" href="${l.url}" target="_blank" rel="noopener">運行情報の詳細を見る ↗</a>
           </div>
         </article>`;
       }).join("");
@@ -974,9 +981,9 @@
   // スナップショット、神鉄データ、道路交通データの読み込み
   async function load({ manual = false } = {}) {
     try {
-      const [snapRes, shinRes, trafficRes] = await Promise.allSettled([
+      const [snapRes, railRes, trafficRes] = await Promise.allSettled([
         fetch(SNAPSHOT_URL, { cache: "no-store" }),
-        fetch(SHINTETSU_URL, { cache: "no-store" }),
+        fetch(RAIL_URL, { cache: "no-store" }),
         fetch(TRAFFIC_URL, { cache: "no-store" }),
       ]);
 
@@ -988,15 +995,17 @@
         throw new Error(errStatus === 503 ? "データの準備ができていません" : `HTTP ${errStatus}`);
       }
 
-      if (shinRes.status === "fulfilled" && shinRes.value.ok) {
+      if (railRes.status === "fulfilled" && railRes.value.ok) {
         try {
-          const shinData = await shinRes.value.json();
-          shintetsuStatus = parseShintetsuStatus(shinData);
+          railData = await railRes.value.json();
+          shintetsuStatus = parseRailLineStatus(railData?.lines?.shintetsu, "shintetsu");
         } catch (e) {
-          console.warn("神鉄データの解析エラー:", e);
+          console.warn("鉄道データの解析エラー:", e);
+          railData = null;
           shintetsuStatus = parseShintetsuStatus(null);
         }
       } else {
+        railData = null;
         shintetsuStatus = parseShintetsuStatus(null);
       }
 

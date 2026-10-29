@@ -1,4 +1,4 @@
-import { RAIL_LINKS, DASHBOARD_URL, SHINTETSU } from "./config.js";
+import { RAIL_LINKS, RAIL_LINES, DASHBOARD_URL, SHINTETSU } from "./config.js";
 
 /**
  * Chatwork にメッセージを送信する
@@ -133,4 +133,83 @@ export function buildShintetsuAlertMessage(curr, prev) {
   }
 
   return null;
+}
+
+/**
+ * 鉄道4路線（JR神戸線・JR加古川線・神戸電鉄・山陽電車）の運行状況変化から Chatwork 用メッセージを生成する
+ */
+export function buildRailAlertMessage(currRail, prevRail) {
+  if (!currRail || !currRail.lines) return null;
+
+  const prevLines = prevRail?.lines || {};
+  const alerted = [];
+  const recovered = [];
+
+  for (const meta of RAIL_LINES) {
+    const curr = currRail.lines[meta.id];
+    if (!curr || curr.status === "na") continue;
+
+    const prev = prevLines[meta.id];
+    const prevAlert = Boolean(prev?.hasAlert);
+    const currAlert = Boolean(curr.hasAlert);
+
+    if (currAlert && !prevAlert) {
+      alerted.push({ ...meta, ...curr });
+    } else if (!currAlert && curr.status === "ok" && prevAlert) {
+      recovered.push({ ...meta, ...curr });
+    }
+  }
+
+  if (alerted.length === 0 && recovered.length === 0) return null;
+
+  // 1路線のみ運行情報発表の場合
+  if (alerted.length === 1 && recovered.length === 0) {
+    const line = alerted[0];
+    return [
+      `[info][title]⚠ 【${line.name}】運行情報にお知らせがあります[/title]`,
+      `${line.name}の運行情報にお知らせ（遅延・運転見合わせ等）が発表されています。`,
+      "運転状況や対象区間の詳細は、以下の運行情報ページをご確認ください。\n",
+      `▼ ${line.name} 運行情報\n${line.infoUrl}\n`,
+      `▼ 警報ダッシュボード\n${DASHBOARD_URL}`,
+      "[/info]",
+    ].join("\n");
+  }
+
+  // 1路線のみ平常運転復帰の場合
+  if (recovered.length === 1 && alerted.length === 0) {
+    const line = recovered[0];
+    return [
+      `[info][title]✅ 【${line.name}】平常運転に復帰しました[/title]`,
+      `${line.name}の運行情報のお知らせが解除され、平常運転に戻りました。\n`,
+      `▼ ${line.name} 運行情報\n${line.infoUrl}\n`,
+      `▼ 警報ダッシュボード\n${DASHBOARD_URL}`,
+      "[/info]",
+    ].join("\n");
+  }
+
+  // 複数路線で同時に変化があった場合
+  const titleNames = [...alerted, ...recovered].map((l) => l.name).join("・");
+  const msgLines = [
+    `[info][title]🚃 【鉄道運行情報】${titleNames} の状況が更新されました[/title]`,
+  ];
+
+  if (alerted.length > 0) {
+    msgLines.push("【⚠ 運行情報あり（遅延・運転見合わせ等）】");
+    for (const l of alerted) {
+      msgLines.push(`・${l.name}： ${l.infoUrl}`);
+    }
+    msgLines.push("");
+  }
+
+  if (recovered.length > 0) {
+    msgLines.push("【✅ 平常運転に復帰】");
+    for (const l of recovered) {
+      msgLines.push(`・${l.name}： ${l.infoUrl}`);
+    }
+    msgLines.push("");
+  }
+
+  msgLines.push(`▼ 警報ダッシュボード\n${DASHBOARD_URL}`);
+  msgLines.push("[/info]");
+  return msgLines.join("\n");
 }

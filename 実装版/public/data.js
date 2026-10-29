@@ -4,6 +4,11 @@
 // ?src=URL で一時的に差し替えられる（サンプル確認は ?src=data/snapshot.sample.json）
 const SNAPSHOT_URL =
   new URLSearchParams(location.search).get("src") || "https://keihou-dashboard.keihou-dashboard-worker.workers.dev/api/snapshot";
+const RAIL_URL =
+  new URLSearchParams(location.search).get("rail_src") ||
+  (SNAPSHOT_URL.includes("/api/snapshot")
+    ? SNAPSHOT_URL.replace("/api/snapshot", "/api/rail")
+    : "https://keihou-dashboard.keihou-dashboard-worker.workers.dev/api/rail");
 const SHINTETSU_URL =
   new URLSearchParams(location.search).get("shintetsu_src") ||
   (SNAPSHOT_URL.includes("/api/snapshot")
@@ -17,7 +22,7 @@ const TRAFFIC_URL =
 const IS_SAMPLE = SNAPSHOT_URL.includes("sample");
 const STALE_MINUTES = 30; // これより古いスナップショットは「古い可能性」を表示する
 
-// 神戸電鉄の運行情報ステータス（規約配慮のため、平常か運行情報ありかのみ検知）
+// 神戸電鉄の運行情報ステータス（後方互換用）
 function parseShintetsuStatus(data) {
   if (!data || data.kind_code === undefined || data.kind_code === null) {
     return { status: "na", label: "確認中", cls: "status-na", hasAlert: false, text: "運行情報は公式HPでご確認ください" };
@@ -41,12 +46,41 @@ function parseShintetsuStatus(data) {
   };
 }
 
-// 鉄道路線設定（神戸電鉄はAPI連携、JR・山陽は公式ページへのリンク）
+// 4路線の統合運行情報ステータスを画面表示用に変換（規約配慮のため、平常か運行情報ありかのみ表示）
+function parseRailLineStatus(lineData, lineId) {
+  if (!lineData || lineData.status === "na") {
+    return {
+      status: "na",
+      label: "確認中",
+      cls: "status-na",
+      hasAlert: false,
+      text: "運行情報は運行情報ページでご確認ください",
+    };
+  }
+  if (lineData.status === "ok" && !lineData.hasAlert) {
+    return {
+      status: "ok",
+      label: "平常運転",
+      cls: "status-ok",
+      hasAlert: false,
+      text: lineId === "shintetsu" ? "現在、30分以上の遅れ等はありません" : "現在、事故・遅延等の運行情報はありません",
+    };
+  }
+  return {
+    status: "delay",
+    label: "運行情報あり",
+    cls: "status-delay",
+    hasAlert: true,
+    text: "遅延・運転見合わせ等の運行情報が発表されています。リンク先で詳細をご確認ください。",
+  };
+}
+
+// 鉄道路線設定（4路線すべて自動検知連携）
 const TRAIN_LINES = [
-  { id: "jr-kobe", name: "JR神戸線", section: "姫路〜三ノ宮", color: "#1e6fd9", url: "https://www.train-guide.westjr.co.jp/" },
-  { id: "jr-kakogawa", name: "JR加古川線", section: "加古川〜谷川", color: "#14b8a6", url: "https://www.train-guide.westjr.co.jp/" },
-  { id: "shintetsu", name: "神戸電鉄 全線", section: "粟生線・有馬線・三田線など", color: "#f97316", url: "https://www.shintetsu.co.jp/railinfo/" },
-  { id: "sanyo", name: "山陽電車 本線", section: "神戸三宮〜山陽姫路", color: "#e11d48", url: "https://www.sanyo-railway.co.jp/" },
+  { id: "jr-kobe", name: "JR神戸線", section: "姫路〜三ノ宮", color: "#1e6fd9", url: "https://trafficinfo.westjr.co.jp/kinki.html" },
+  { id: "jr-kakogawa", name: "JR加古川線", section: "加古川〜谷川", color: "#14b8a6", url: "https://trafficinfo.westjr.co.jp/kinki.html" },
+  { id: "shintetsu", name: "神戸電鉄 全線", section: "粟生線・有馬線・三田線など", color: "#f97316", url: "https://www.shintetsu.co.jp/railway/railinfo/" },
+  { id: "sanyo", name: "山陽電車 本線", section: "神戸三宮〜山陽姫路", color: "#e11d48", url: "https://transit.yahoo.co.jp/diainfo/354/0" },
 ];
 
 // 警戒レベル（気象庁の数値）→ 画面のクラス名

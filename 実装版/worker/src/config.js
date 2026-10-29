@@ -104,11 +104,43 @@ export const SHINTETSU = {
   infoUrl: "https://www.shintetsu.co.jp/railway/railinfo/",
 };
 
+// 鉄道運行情報の取得元エンドポイント（案B：公式JSON＋Yahoo!路線情報ハイブリッド）
+export const RAIL_SOURCES = {
+  shintetsu: "https://www.shintetsu.co.jp/railinfo_common/json/top_summary.json",
+  jrWestTraffic: "https://trafficinfo.westjr.co.jp/api/v1/trafficinfo.json",
+  jrWestKinkiGuide: "https://www.train-guide.westjr.co.jp/api/v3/area_kinki_trafficinfo.json",
+  yahooKinki: "https://transit.yahoo.co.jp/diainfo/area/6",
+};
+
+// 監視対象の4路線定義
+export const RAIL_LINES = [
+  {
+    id: "jr-kobe",
+    name: "JR神戸線",
+    infoUrl: "https://trafficinfo.westjr.co.jp/kinki.html",
+  },
+  {
+    id: "jr-kakogawa",
+    name: "JR加古川線",
+    infoUrl: "https://trafficinfo.westjr.co.jp/kinki.html",
+  },
+  {
+    id: "shintetsu",
+    name: "神戸電鉄 全線",
+    infoUrl: "https://www.shintetsu.co.jp/railway/railinfo/",
+  },
+  {
+    id: "sanyo",
+    name: "山陽電車 本線",
+    infoUrl: "https://transit.yahoo.co.jp/diainfo/354/0",
+  },
+];
+
 // 通知に添える交通情報リンク
 export const RAIL_LINKS = [
   { name: "神戸電鉄", url: "https://www.shintetsu.co.jp/railway/railinfo/" },
   { name: "JR西日本（加古川線・神戸線）", url: "https://trafficinfo.westjr.co.jp/kinki.html" },
-  { name: "山陽電車", url: "https://www.sanyo-railway.co.jp/" },
+  { name: "山陽電車（運行情報）", url: "https://transit.yahoo.co.jp/diainfo/354/0" },
 ];
 
 export const DASHBOARD_URL = "https://keihou-dashboard-web.keihou-dashboard-worker.workers.dev/";
