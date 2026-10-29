@@ -2494,3 +2494,98 @@ body.mine .count-pill {
   padding-bottom: 4px;
   border-bottom: 1px dashed var(--border);
 }
+
+/* --- v0.12.1-dev: マイルート省スペース表示 ＆ ポップアップモーダル用スタイル --- */
+.commute-card {
+  padding: 11px 13px;
+  margin-bottom: 12px;
+}
+.commute-head {
+  align-items: center;
+  margin-bottom: 8px;
+}
+.commute-title {
+  font-size: 14px;
+}
+.commute-list {
+  gap: 7px;
+}
+.commute-item {
+  padding: 7px 10px;
+  gap: 6px;
+}
+.commute-item-head {
+  gap: 6px;
+}
+.commute-item-title {
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.commute-actions {
+  grid-template-columns: repeat(2, 1fr);
+  gap: 6px;
+}
+.commute-go-btn.compact {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 9px;
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--text);
+  background: #ffffff;
+  border: 1.5px solid var(--border);
+  text-decoration: none;
+  min-width: 0;
+}
+.commute-go-btn.compact:hover {
+  border-color: var(--accent);
+  background: #f0fdfa;
+}
+.commute-go-btn.compact .cg-route-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.commute-go-btn.compact .cg-arrow {
+  color: var(--accent);
+  font-weight: 900;
+  flex-shrink: 0;
+}
+.commute-sheet-body {
+  max-height: 90vh;
+  overflow-y: auto;
+}
+.commute-modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding-bottom: 8px;
+  margin-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+}
+.commute-close-x {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 3px 9px;
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--muted);
+  cursor: pointer;
+}
+.commute-point-box {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 8px 10px;
+  display: grid;
+  gap: 7px;
+}

@@ -172,57 +172,13 @@
           <span class="road-source-tag" id="road-source-badge"></span>
         </div>
 
-        <!-- マイルート（スタート ⇄ ゴール 複数登録対応・Googleマップ直行・localStorage保存） -->
+        <!-- マイルート（省スペース一覧表示・localStorage保存） -->
         <div class="card commute-card" id="commute-card">
           <div class="commute-head">
-            <div class="commute-title-group">
-              <span class="commute-icon">🗺</span>
-              <div>
-                <h3 class="commute-title">マイルート確認（Googleマップ）</h3>
-                <p class="commute-sub">スタート・ゴールを登録して、行き帰りの交通情報をすぐ確認できます（複数登録可）</p>
-              </div>
-            </div>
+            <h3 class="commute-title">マイルート</h3>
             <button type="button" class="commute-add-btn" id="commute-add-btn">＋ ルートを登録</button>
           </div>
-
-          <!-- 登録済みルート一覧ビュー（通常表示） -->
-          <div id="commute-saved-view" class="commute-saved">
-            <div id="commute-list" class="commute-list"></div>
-          </div>
-
-          <!-- 登録・編集フォームビュー（登録ボタンを押した時のみ表示） -->
-          <form id="commute-form" class="commute-form" hidden>
-            <div class="commute-form-title" id="commute-form-title">＋ 新しいルートを登録</div>
-            <div class="commute-field">
-              <label for="commute-label">📝 ルート名（任意）</label>
-              <input type="text" id="commute-label" placeholder="例：通勤（バイパス経由）、通勤（175号経由）など（空欄でもOK）" />
-            </div>
-            <div class="commute-field">
-              <label for="commute-home">🚩 スタート（出発地）<span class="req">必須</span></label>
-              <div class="commute-input-row">
-                <input type="text" id="commute-home" placeholder="例：自宅の住所、〇〇駅、〇〇交差点 など" required />
-                <button type="button" class="commute-geo-btn" id="commute-geo-home" title="現在地を入力">📍現在地</button>
-              </div>
-            </div>
-            <div class="commute-field">
-              <label for="commute-work">🏁 ゴール（目的地）<span class="req">必須</span></label>
-              <div class="commute-input-row">
-                <input type="text" id="commute-work" placeholder="例：職場の住所、施設名、〇〇交差点 など" required />
-                <button type="button" class="commute-geo-btn" id="commute-geo-work" title="現在地を入力">📍現在地</button>
-              </div>
-            </div>
-            <div class="commute-field">
-              <label for="commute-via">🛣 経由地（任意・通るICや交差点があれば）</label>
-              <input type="text" id="commute-via" placeholder="例：加古川中央JCT、天神町交差点 など（空欄でもOK）" />
-            </div>
-            <div class="commute-form-btns">
-              <button type="submit" class="commute-save-btn">💾 保存する</button>
-              <button type="button" class="commute-cancel-btn" id="commute-cancel-btn">キャンセル</button>
-            </div>
-            <p class="commute-privacy-note">
-              🔒 登録内容はあなたの端末（ブラウザのlocalStorage）内にのみ保存され、外部や他の職員には共有されません。
-            </p>
-          </form>
+          <div id="commute-list" class="commute-list"></div>
         </div>
 
         <!-- 操作バー：凡例 ＆ 表示形式（マップ / リスト）切り替え -->
@@ -255,7 +211,7 @@
       <p>気象情報：気象庁の公開データをもとに作成しています。</p>
       <p>詳しい天気は各市町の「天気」リンク（Yahoo!天気）から確認できます。</p>
       <p>交通情報：鉄道4路線（JR神戸線・JR加古川線・神戸電鉄・山陽電車）の運行有無、主要幹線道路の区間所要時間に対応しています。</p>
-      <p class="ver">v0.12.0-dev</p>
+      <p class="ver">v0.12.1-dev</p>
     </footer>
   </main>
 
@@ -290,6 +246,59 @@
   </nav>
 
   <div id="toast" class="toast" role="status"></div>
+
+  <!-- マイルート登録・編集ポップアップシート -->
+  <div id="commute-sheet" class="sheet" hidden>
+    <div class="sheet-body card commute-sheet-body">
+      <div class="commute-modal-head">
+        <h3 id="commute-form-title" class="card-title" style="margin:0">＋ ルートを登録</h3>
+        <button type="button" id="commute-close-x" class="commute-close-x" aria-label="閉じる">✕</button>
+      </div>
+      <form id="commute-form" class="commute-form">
+        <div class="commute-field">
+          <label for="commute-label">ルート名（任意）</label>
+          <input type="text" id="commute-label" placeholder="例：通勤（バイパス経由）など（省略可）" />
+        </div>
+        <div class="commute-point-box">
+          <div class="commute-field">
+            <label for="commute-home">スタート地点（住所・施設名など）<span class="req">必須</span></label>
+            <div class="commute-input-row">
+              <input type="text" id="commute-home" placeholder="例：加古川市加古川町〇〇、加古川駅" required />
+              <button type="button" class="commute-geo-btn" id="commute-geo-home" title="現在地を入力">📍現在地</button>
+            </div>
+          </div>
+          <div class="commute-field">
+            <label for="commute-home-name">スタートの表示名（省略可・省略時は地点名を表示）</label>
+            <input type="text" id="commute-home-name" placeholder="例：自宅（施設名などをそのまま出す場合は空欄）" />
+          </div>
+        </div>
+        <div class="commute-point-box">
+          <div class="commute-field">
+            <label for="commute-work">ゴール地点（住所・施設名など）<span class="req">必須</span></label>
+            <div class="commute-input-row">
+              <input type="text" id="commute-work" placeholder="例：小野市〇〇町、職場名、施設名" required />
+              <button type="button" class="commute-geo-btn" id="commute-geo-work" title="現在地を入力">📍現在地</button>
+            </div>
+          </div>
+          <div class="commute-field">
+            <label for="commute-work-name">ゴールの表示名（省略可・省略時は地点名を表示）</label>
+            <input type="text" id="commute-work-name" placeholder="例：職場（施設名などをそのまま出す場合は空欄）" />
+          </div>
+        </div>
+        <div class="commute-field">
+          <label for="commute-via">経由地（任意・通るICや交差点があれば）</label>
+          <input type="text" id="commute-via" placeholder="例：加古川中央JCT、天神町交差点 など（空欄でもOK）" />
+        </div>
+        <div class="commute-form-btns">
+          <button type="button" class="commute-cancel-btn" id="commute-cancel-btn">キャンセル</button>
+          <button type="submit" class="commute-save-btn">保存する</button>
+        </div>
+        <p class="commute-privacy-note">
+          🔒 登録内容はこの端末のブラウザ（localStorage）内にのみ保存され、外部や他の職員には共有されません。
+        </p>
+      </form>
+    </div>
+  </div>
 
   <!-- 道路区間詳細モーダルシート -->
   <div id="road-sheet" class="sheet" hidden>

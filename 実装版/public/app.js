@@ -1,4 +1,4 @@
-/* 気象・交通状況ダッシュボード v0.12.0-dev（4ページタブ切替対応／気象：スナップショット対応／鉄道4路線運行情報連携／道路交通情報・マイルート複数登録対応） */
+/* 気象・交通状況ダッシュボード v0.12.1-dev（4ページタブ切替対応／気象：スナップショット対応／鉄道4路線運行情報連携／道路交通情報・マイルート省スペース表示＆ポップアップ登録対応） */
 (() => {
   const LV_ORDER = { emergency: 4, danger: 3, warning: 2, advisory: 1 };
   const LV_CLASS = ["none", "advisory", "warning", "danger", "emergency"];
@@ -403,12 +403,14 @@
           .map((r, idx) => {
             const toWorkUrl = buildCommuteMapsUrl(r.home, r.work, r.via);
             const toHomeUrl = buildCommuteMapsUrl(r.work, r.home, r.via);
-            const title = r.label || `ルート${idx + 1}（${r.home}⇄${r.work}）`;
+            const title = r.label || `ルート ${idx + 1}`;
+            const startDisp = r.homeName || r.home;
+            const goalDisp = r.workName || r.work;
             return `
               <div class="sc-commute-bar">
-                <span class="sc-commute-label">🗺 ${esc(title)}：</span>
-                <a href="${esc(toWorkUrl)}" target="_blank" rel="noopener noreferrer" class="sc-commute-link">▶ 行き ↗</a>
-                <a href="${esc(toHomeUrl)}" target="_blank" rel="noopener noreferrer" class="sc-commute-link">◀ 帰り ↗</a>
+                <span class="sc-commute-label">${esc(title)}：</span>
+                <a href="${esc(toWorkUrl)}" target="_blank" rel="noopener noreferrer" class="sc-commute-link">${esc(startDisp)} → ${esc(goalDisp)} ↗</a>
+                <a href="${esc(toHomeUrl)}" target="_blank" rel="noopener noreferrer" class="sc-commute-link">${esc(goalDisp)} → ${esc(startDisp)} ↗</a>
               </div>
             `;
           })
@@ -688,31 +690,15 @@
     renderCommute();
   }
 
-  // マイルート（スタート ⇄ ゴール 複数登録・Googleマップ直行）の描画
+  // マイルート（省スペース一覧表示・Googleマップ直行）の描画
   function renderCommute() {
-    const savedView = $("#commute-saved-view");
     const listEl = $("#commute-list");
-    const form = $("#commute-form");
-    const addBtn = $("#commute-add-btn");
-    const formTitle = $("#commute-form-title");
-    if (!savedView || !listEl || !form) return;
-
-    // 登録画面（フォーム）は登録・編集ボタンを押した時のみ表示する
-    savedView.hidden = commuteFormOpen;
-    form.hidden = !commuteFormOpen;
-    if (addBtn) addBtn.hidden = commuteFormOpen;
-
-    if (commuteFormOpen) {
-      if (formTitle) {
-        formTitle.textContent = editingRouteId ? "✏️ ルートを編集" : "＋ 新しいルートを登録";
-      }
-      return;
-    }
+    if (!listEl) return;
 
     if (commuteRoutes.length === 0) {
       listEl.innerHTML = `
         <div class="commute-empty">
-          <span>まだルートが登録されていません。右上の「＋ ルートを登録」からスタート・ゴールを登録できます。</span>
+          <span>登録されたルートはありません。「＋ ルートを登録」から追加できます。</span>
         </div>
       `;
       return;
@@ -722,41 +708,26 @@
       .map((r, i) => {
         const toGoalUrl = buildCommuteMapsUrl(r.home, r.work, r.via);
         const toStartUrl = buildCommuteMapsUrl(r.work, r.home, r.via);
-        const nameBadge = r.label
-          ? `<span class="commute-item-name">${esc(r.label)}</span>`
-          : `<span class="commute-item-name">ルート ${i + 1}</span>`;
-        const viaHtml = r.via
-          ? `<span>⇄</span><span class="commute-route-tag">🛣 経由：${esc(r.via)}</span>`
-          : "";
+        const title = r.label || `ルート ${i + 1}`;
+        const startDisp = r.homeName || r.home;
+        const goalDisp = r.workName || r.work;
         return `
           <div class="commute-item" data-route-id="${esc(r.id)}">
             <div class="commute-item-head">
-              <div class="commute-item-info">
-                ${nameBadge}
-                <span class="commute-route-tag">🚩 ${esc(r.home)}</span>
-                ${viaHtml}
-                <span>⇄</span>
-                <span class="commute-route-tag">🏁 ${esc(r.work)}</span>
-              </div>
+              <span class="commute-item-title">${esc(title)}</span>
               <div class="commute-item-ctrl">
-                <button type="button" class="commute-mini-btn" data-commute-edit="${esc(r.id)}">✏️ 編集</button>
-                <button type="button" class="commute-mini-btn del" data-commute-del="${esc(r.id)}">🗑 削除</button>
+                <button type="button" class="commute-mini-btn" data-commute-edit="${esc(r.id)}">編集</button>
+                <button type="button" class="commute-mini-btn del" data-commute-del="${esc(r.id)}">削除</button>
               </div>
             </div>
             <div class="commute-actions">
-              <a href="${esc(toGoalUrl)}" target="_blank" rel="noopener noreferrer" class="commute-go-btn to-work">
-                <span class="cg-icon">🚩</span>
-                <span class="cg-text">
-                  <b>行き（${esc(r.home)} → ${esc(r.work)}）</b>
-                  <small>現在の渋滞・所要時間をGoogleマップで開く ↗</small>
-                </span>
+              <a href="${esc(toGoalUrl)}" target="_blank" rel="noopener noreferrer" class="commute-go-btn compact" title="${esc(r.home)} → ${esc(r.work)}">
+                <span class="cg-route-text">${esc(startDisp)} → ${esc(goalDisp)}</span>
+                <span class="cg-arrow">↗</span>
               </a>
-              <a href="${esc(toStartUrl)}" target="_blank" rel="noopener noreferrer" class="commute-go-btn to-home">
-                <span class="cg-icon">🏁</span>
-                <span class="cg-text">
-                  <b>帰り（${esc(r.work)} → ${esc(r.home)}）</b>
-                  <small>現在の渋滞・所要時間をGoogleマップで開く ↗</small>
-                </span>
+              <a href="${esc(toStartUrl)}" target="_blank" rel="noopener noreferrer" class="commute-go-btn compact" title="${esc(r.work)} → ${esc(r.home)}">
+                <span class="cg-route-text">${esc(goalDisp)} → ${esc(startDisp)}</span>
+                <span class="cg-arrow">↗</span>
               </a>
             </div>
           </div>
@@ -1233,61 +1204,78 @@
     renderRoads();
   });
 
-  // マイルート（スタート ⇄ ゴール 複数登録）の追加・編集・保存・削除イベント
+  // マイルート（ポップアップ画面での追加・編集・保存・削除イベント）
   const openCommuteForm = (route = null) => {
     editingRouteId = route ? route.id : null;
     commuteFormOpen = true;
+    const sheet = $("#commute-sheet");
+    const formTitle = $("#commute-form-title");
     const labelInput = $("#commute-label");
     const homeInput = $("#commute-home");
+    const homeNameInput = $("#commute-home-name");
     const workInput = $("#commute-work");
+    const workNameInput = $("#commute-work-name");
     const viaInput = $("#commute-via");
+    if (formTitle) formTitle.textContent = route ? "ルートを編集" : "＋ ルートを登録";
     if (labelInput) labelInput.value = route?.label || "";
     if (homeInput) homeInput.value = route?.home || "";
+    if (homeNameInput) homeNameInput.value = route?.homeName || "";
     if (workInput) workInput.value = route?.work || "";
+    if (workNameInput) workNameInput.value = route?.workName || "";
     if (viaInput) viaInput.value = route?.via || "";
-    renderCommute();
+    if (sheet) sheet.hidden = false;
     homeInput?.focus();
+  };
+
+  const closeCommuteForm = () => {
+    commuteFormOpen = false;
+    editingRouteId = null;
+    const sheet = $("#commute-sheet");
+    if (sheet) sheet.hidden = true;
   };
 
   $("#commute-add-btn")?.addEventListener("click", () => {
     openCommuteForm(null);
   });
 
-  $("#commute-cancel-btn")?.addEventListener("click", () => {
-    commuteFormOpen = false;
-    editingRouteId = null;
-    renderCommute();
+  $("#commute-cancel-btn")?.addEventListener("click", closeCommuteForm);
+  $("#commute-close-x")?.addEventListener("click", closeCommuteForm);
+  $("#commute-sheet")?.addEventListener("click", (e) => {
+    if (e.target.id === "commute-sheet") closeCommuteForm();
   });
 
   $("#commute-form")?.addEventListener("submit", (e) => {
     e.preventDefault();
     const label = $("#commute-label")?.value.trim() || "";
     const home = $("#commute-home")?.value.trim() || "";
+    const homeName = $("#commute-home-name")?.value.trim() || "";
     const work = $("#commute-work")?.value.trim() || "";
+    const workName = $("#commute-work-name")?.value.trim() || "";
     const via = $("#commute-via")?.value.trim() || "";
     if (!home || !work) {
-      toast("スタートとゴールの両方を入力してください");
+      toast("スタート地点とゴール地点の両方を入力してください");
       return;
     }
 
     if (editingRouteId) {
       commuteRoutes = commuteRoutes.map((r) =>
-        r.id === editingRouteId ? { ...r, label, home, work, via } : r
+        r.id === editingRouteId ? { ...r, label, home, homeName, work, workName, via } : r
       );
-      toast("🗺 マイルートを更新しました");
+      toast("マイルートを更新しました");
     } else {
       commuteRoutes.push({
         id: "r_" + Date.now() + "_" + Math.random().toString(36).slice(2, 6),
         label,
         home,
+        homeName,
         work,
+        workName,
         via,
       });
-      toast("🗺 新しいマイルートを登録しました");
+      toast("新しいマイルートを登録しました");
     }
     saveCommuteRoutes();
-    commuteFormOpen = false;
-    editingRouteId = null;
+    closeCommuteForm();
     renderCommute();
     if (model) renderHero();
   });
