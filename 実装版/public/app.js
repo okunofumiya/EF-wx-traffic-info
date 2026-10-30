@@ -1,4 +1,4 @@
-/* 気象・交通状況ダッシュボード v0.12.1-dev（4ページタブ切替対応／気象：スナップショット対応／鉄道4路線運行情報連携／道路交通情報・マイルート省スペース表示＆ポップアップ登録対応） */
+/* 気象・交通状況ダッシュボード v0.12.4-dev（4ページタブ切替対応／気象：スナップショット対応／鉄道4路線連携［JR神戸線は西明石〜姫路限定］／道路交通情報・マイルート対応） */
 (() => {
   const LV_ORDER = { emergency: 4, danger: 3, warning: 2, advisory: 1 };
   const LV_CLASS = ["none", "advisory", "warning", "danger", "emergency"];
@@ -111,7 +111,6 @@
     renderRoads();
     renderTimeline();
     renderEarly();
-    renderBand();
   }
 
   function renderMeta() {
@@ -508,6 +507,11 @@
       btn.classList.toggle("active", btn.dataset.page === pageId);
     });
 
+    // ページ下部の注釈（フッター）をページごとに切り替え
+    document.querySelectorAll("[data-footer]").forEach((el) => {
+      el.hidden = el.dataset.footer !== pageId;
+    });
+
     // 最上部へスクロール
     window.scrollTo({ top: 0, behavior: "instant" });
 
@@ -613,9 +617,14 @@
       return;
     }
     $("#train-list").innerHTML =
-      '<p class="note train-note">※ 4路線（JR神戸線・JR加古川線・神戸電鉄・山陽電車）すべての運行情報の有無を自動反映しています。詳細・最新状況は各運行情報ページをご確認ください。</p>' +
+      '<p class="note train-note">※ 4路線（JR神戸線・JR加古川線・神戸電鉄・山陽電車）すべての運行情報の有無を自動反映しています。詳細・最新状況は各運行情報ページ（Yahoo!路線情報）をご確認ください。</p>' +
       scope.map((l, i) => {
         const st = getLineStatus(l.id);
+        const linksHtml = Array.isArray(l.links)
+          ? `<div class="train-links" style="display:flex;gap:12px;flex-wrap:wrap;margin-top:4px">${l.links
+              .map((lk) => `<a class="train-link" href="${lk.url}" target="_blank" rel="noopener">${esc(lk.label)}</a>`)
+              .join("")}</div>`
+          : `<a class="train-link" href="${l.url}" target="_blank" rel="noopener">運行情報の詳細を見る ↗</a>`;
         return `
         <article class="card train ${st.hasAlert ? "train-alert" : ""}" id="train-${l.id}" style="--line:${l.color};animation-delay:${i * 60}ms">
           <span class="train-color"></span>
@@ -631,7 +640,7 @@
               </div>
             </div>
             ${st.text ? `<p class="train-msg ${st.hasAlert ? "alert" : ""}">${esc(st.text)}</p>` : ""}
-            <a class="train-link" href="${l.url}" target="_blank" rel="noopener">運行情報の詳細を見る ↗</a>
+            ${linksHtml}
           </div>
         </article>`;
       }).join("");
@@ -1068,10 +1077,6 @@
     });
     $("#early-grid").innerHTML = html;
     $("#early-text").textContent = text || "";
-  }
-
-  function renderBand() {
-    $("#band-list").innerHTML = '<p class="empty card">BAND への自動投稿は準備中です</p>';
   }
 
   function toast(msg) {

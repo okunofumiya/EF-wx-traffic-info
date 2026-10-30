@@ -55,9 +55,69 @@ export function parseShintetsu(data) {
   };
 }
 
+// JR神戸線（および前後の直通区間）の東→西の駅順リスト
+// ※JR神戸線は「西明石〜姫路」の間のみを監視対象とし、西明石以東（大阪〜西明石、京都〜大阪など）のみの遅延は除外する
+export const JR_KOBE_STATIONS = [
+  // JR京都線側
+  "京都", "西大路", "桂川", "向日町", "長岡京", "山崎", "島本", "高槻", "摂津富田", "ＪＲ総持寺", "JR総持寺", "茨木", "千里丘", "岸辺", "吹田", "東淀川", "新大阪",
+  // JR神戸線（大阪〜明石：西明石より東）
+  "大阪", "塚本", "尼崎", "立花", "甲子園口", "西宮", "さくら夙川", "芦屋", "甲南山手", "摂津本山", "住吉", "六甲道", "摩耶", "灘", "三ノ宮", "元町", "神戸", "兵庫", "新長田", "鷹取", "須磨海浜公園", "須磨", "塩屋", "垂水", "舞子", "朝霧", "明石",
+  // 対象区間の東端（境界）
+  "西明石",
+  // 対象区間内（西明石〜姫路）
+  "大久保", "魚住", "土山", "東加古川", "加古川", "宝殿", "曽根", "ひめじ別所", "御着", "東姫路",
+  // 対象区間の西端（境界）
+  "姫路",
+  // 山陽線（姫路より西）
+  "英賀保", "はりま勝原", "網干", "竜野", "相生", "有年", "上郡",
+];
+
+const NISHI_AKASHI_IDX = JR_KOBE_STATIONS.indexOf("西明石");
+const HIMEJI_IDX = JR_KOBE_STATIONS.indexOf("姫路");
+
+/**
+ * JR神戸線の運行情報区間（startStation 〜 endStation）が「西明石〜姫路」の間を含むか判定する
+ * - 「大阪〜西明石」「大阪〜神戸」「京都〜大阪」など西明石以東のみの区間 → false
+ * - 「姫路〜網干」など姫路以西のみの区間 → false
+ * - 「西明石〜姫路」「大阪〜姫路」「大阪〜加古川」「神戸〜姫路」など西明石〜姫路を含む区間 → true
+ */
+export function isJrKobeSectionInTarget(startStation, endStation) {
+  const sName = String(startStation || "").trim();
+  const eName = String(endStation || "").trim();
+  if (!sName && !eName) return true;
+
+  const sIdx = JR_KOBE_STATIONS.indexOf(sName);
+  const eIdx = eName ? JR_KOBE_STATIONS.indexOf(eName) : sIdx;
+
+  // 駅名がリストにない未知表記の場合は安全側で true
+  if (sIdx === -1 || eIdx === -1) return true;
+
+  if (sIdx === eIdx) {
+    return sIdx >= NISHI_AKASHI_IDX && sIdx <= HIMEJI_IDX;
+  }
+
+  const minIdx = Math.min(sIdx, eIdx);
+  const maxIdx = Math.max(sIdx, eIdx);
+  return maxIdx > NISHI_AKASHI_IDX && minIdx < HIMEJI_IDX;
+}
+
+/**
+ * 運行情報詳細（detail）が実際の列車遅れ・運転見合わせ等か判定する
+ * ※ iconType="0000" / "0999"（conditionName="お知らせ"：有料座席「うれしート」設定中止案内など）は除外
+ */
+function isActionableTroubleDetail(detail) {
+  if (!detail) return false;
+  const icon = String(detail.iconType || "");
+  const cond = String(detail.conditionName || "");
+  if (icon === "0000" || icon === "0999" || cond === "お知らせ") {
+    return false;
+  }
+  return true;
+}
+
 /**
  * 2. JR西日本 公式JSON (api/v1/trafficinfo.json) の解析
- *    対象: JR神戸線 (masterData id=4) / JR加古川線 (masterData id=16)
+ *    対象: JR神戸線 (masterData id=4、西明石〜姫路間のみ) / JR加古川線 (masterData id=16)
  */
 export function parseJrWest(trafficData) {
   if (!trafficData || !Array.isArray(trafficData.areaTrafficInfos)) {
@@ -83,13 +143,17 @@ export function parseJrWest(trafficData) {
     }
   }
 
-  const hasLineTrouble = (targetId, nameKeyword) => {
+  const hasLineTrouble = (targetId, nameKeyword, { filterKobeSection = false } = {}) => {
     for (const area of trafficData.areaTrafficInfos) {
       // 1) conventionalLineDelayInfos のチェック
-      const delayInfos = area.conventionalLineDelayInfos || [];
-      for (const d of delayInfos) {
-        if (Number(d.id) === targetId || String(d.lineName || d.name || "").includes(nameKeyword)) {
-          return true;
+      // ※JR神戸線は「大阪〜西明石」のみの遅延でも conventionalLineDelayInfos に id=4 が入るため、
+      //   区間（sections）情報を持つ conventionalLineTrafficInfos のみで厳密判定する
+      if (!filterKobeSection) {
+        const delayInfos = area.conventionalLineDelayInfos || [];
+        for (const d of delayInfos) {
+          if (Number(d.id) === targetId || String(d.lineName || d.name || "").includes(nameKeyword)) {
+            return true;
+          }
         }
       }
 
@@ -101,9 +165,26 @@ export function parseJrWest(trafficData) {
         for (const info of lineInfos) {
           const idMatch = Number(info.id) === targetId || Number(info.lineId) === targetId;
           const nameMatch = String(info.lineName || info.name || "").includes(nameKeyword);
-          if (idMatch || nameMatch) {
-            // conventionalLineTrafficInfoDetails が存在し1件以上ある場合（または details 配列自体が省略されている場合）
-            if (!Array.isArray(info.conventionalLineTrafficInfoDetails) || info.conventionalLineTrafficInfoDetails.length > 0) {
+          if (!idMatch && !nameMatch) continue;
+
+          const details = info.conventionalLineTrafficInfoDetails;
+          if (!Array.isArray(details)) {
+            return true;
+          }
+
+          for (const d of details) {
+            if (!isActionableTroubleDetail(d)) continue;
+
+            if (filterKobeSection) {
+              // JR神戸線：sections 配列のいずれかが「西明石〜姫路」の間を含む場合のみ対象
+              const secs = Array.isArray(d.sections) ? d.sections : [];
+              if (secs.length === 0) {
+                return true;
+              }
+              if (secs.some((s) => isJrKobeSectionInTarget(s.startStation, s.endStation))) {
+                return true;
+              }
+            } else {
               return true;
             }
           }
@@ -113,8 +194,8 @@ export function parseJrWest(trafficData) {
     return false;
   };
 
-  const kobeAlert = hasLineTrouble(kobeId, "神戸線");
-  const kakogawaAlert = hasLineTrouble(kakogawaId, "加古川線");
+  const kobeAlert = hasLineTrouble(kobeId, "神戸線", { filterKobeSection: true });
+  const kakogawaAlert = hasLineTrouble(kakogawaId, "加古川線", { filterKobeSection: false });
 
   return {
     "jr-kobe": makeStatus("jr-kobe", kobeAlert ? "delay" : "ok"),

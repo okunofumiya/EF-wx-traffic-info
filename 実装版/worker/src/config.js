@@ -98,10 +98,10 @@ export const HAZARD_LABELS = {
   なだれ危険度: "なだれ",
 };
 
-// 神戸電鉄の運行情報URL
+// 神戸電鉄の運行情報URL（リンク先はYahoo!路線情報に統一）
 export const SHINTETSU = {
   summaryUrl: "https://www.shintetsu.co.jp/railinfo_common/json/top_summary.json",
-  infoUrl: "https://www.shintetsu.co.jp/railway/railinfo/",
+  infoUrl: "https://transit.yahoo.co.jp/diainfo/353/0",
 };
 
 // 鉄道運行情報の取得元エンドポイント（案B：公式JSON＋Yahoo!路線情報ハイブリッド）
@@ -112,22 +112,22 @@ export const RAIL_SOURCES = {
   yahooKinki: "https://transit.yahoo.co.jp/diainfo/area/6",
 };
 
-// 監視対象の4路線定義
+// 監視対象の4路線定義（リンク先はすべてYahoo!路線情報に統一）
 export const RAIL_LINES = [
   {
     id: "jr-kobe",
-    name: "JR神戸線",
-    infoUrl: "https://trafficinfo.westjr.co.jp/kinki.html",
+    name: "JR神戸線（西明石〜姫路）",
+    infoUrl: "https://transit.yahoo.co.jp/diainfo/273/0",
   },
   {
     id: "jr-kakogawa",
     name: "JR加古川線",
-    infoUrl: "https://trafficinfo.westjr.co.jp/kinki.html",
+    infoUrl: "https://transit.yahoo.co.jp/diainfo/334/0",
   },
   {
     id: "shintetsu",
     name: "神戸電鉄 全線",
-    infoUrl: "https://www.shintetsu.co.jp/railway/railinfo/",
+    infoUrl: "https://transit.yahoo.co.jp/diainfo/353/0",
   },
   {
     id: "sanyo",
@@ -136,11 +136,13 @@ export const RAIL_LINES = [
   },
 ];
 
-// 通知に添える交通情報リンク
+// 通知に添える交通情報リンク（すべてYahoo!路線情報に統一）
 export const RAIL_LINKS = [
-  { name: "神戸電鉄", url: "https://www.shintetsu.co.jp/railway/railinfo/" },
-  { name: "JR西日本（加古川線・神戸線）", url: "https://trafficinfo.westjr.co.jp/kinki.html" },
-  { name: "山陽電車（運行情報）", url: "https://transit.yahoo.co.jp/diainfo/354/0" },
+  { name: "JR神戸線", url: "https://transit.yahoo.co.jp/diainfo/273/0" },
+  { name: "JR加古川線", url: "https://transit.yahoo.co.jp/diainfo/334/0" },
+  { name: "神戸電鉄（粟生線）", url: "https://transit.yahoo.co.jp/diainfo/353/0" },
+  { name: "神戸電鉄（有馬・三田線）", url: "https://transit.yahoo.co.jp/diainfo/350/0" },
+  { name: "山陽電車", url: "https://transit.yahoo.co.jp/diainfo/354/0" },
 ];
 
 export const DASHBOARD_URL = "https://keihou-dashboard-web.keihou-dashboard-worker.workers.dev/";

@@ -25,7 +25,7 @@ const STALE_MINUTES = 30; // これより古いスナップショットは「古
 // 神戸電鉄の運行情報ステータス（後方互換用）
 function parseShintetsuStatus(data) {
   if (!data || data.kind_code === undefined || data.kind_code === null) {
-    return { status: "na", label: "確認中", cls: "status-na", hasAlert: false, text: "運行情報は公式HPでご確認ください" };
+    return { status: "na", label: "確認中", cls: "status-na", hasAlert: false, text: "運行情報はリンク先（Yahoo!路線情報）でご確認ください" };
   }
   const isNormal = String(data.kind_code) === "0";
   if (isNormal) {
@@ -42,7 +42,7 @@ function parseShintetsuStatus(data) {
     label: "運行情報あり",
     cls: "status-delay",
     hasAlert: true,
-    text: "運行情報が発表されています。詳細は公式HPをご確認ください。",
+    text: "運行情報が発表されています。リンク先で詳細をご確認ください。",
   };
 }
 
@@ -54,7 +54,7 @@ function parseRailLineStatus(lineData, lineId) {
       label: "確認中",
       cls: "status-na",
       hasAlert: false,
-      text: "運行情報は運行情報ページでご確認ください",
+      text: "運行情報はリンク先（Yahoo!路線情報）でご確認ください",
     };
   }
   if (lineData.status === "ok" && !lineData.hasAlert) {
@@ -75,11 +75,21 @@ function parseRailLineStatus(lineData, lineId) {
   };
 }
 
-// 鉄道路線設定（4路線すべて自動検知連携）
+// 鉄道路線設定（4路線すべて自動検知連携、リンク先はすべてYahoo!路線情報に統一）
 const TRAIN_LINES = [
-  { id: "jr-kobe", name: "JR神戸線", section: "姫路〜三ノ宮", color: "#1e6fd9", url: "https://trafficinfo.westjr.co.jp/kinki.html" },
-  { id: "jr-kakogawa", name: "JR加古川線", section: "加古川〜谷川", color: "#14b8a6", url: "https://trafficinfo.westjr.co.jp/kinki.html" },
-  { id: "shintetsu", name: "神戸電鉄 全線", section: "粟生線・有馬線・三田線など", color: "#f97316", url: "https://www.shintetsu.co.jp/railway/railinfo/" },
+  { id: "jr-kobe", name: "JR神戸線", section: "西明石〜姫路", color: "#1e6fd9", url: "https://transit.yahoo.co.jp/diainfo/273/0" },
+  { id: "jr-kakogawa", name: "JR加古川線", section: "加古川〜谷川", color: "#14b8a6", url: "https://transit.yahoo.co.jp/diainfo/334/0" },
+  {
+    id: "shintetsu",
+    name: "神戸電鉄 全線",
+    section: "粟生線・有馬線・三田線など",
+    color: "#f97316",
+    url: "https://transit.yahoo.co.jp/diainfo/353/0",
+    links: [
+      { label: "運行情報の詳細（粟生線）↗", url: "https://transit.yahoo.co.jp/diainfo/353/0" },
+      { label: "運行情報の詳細（有馬・三田線）↗", url: "https://transit.yahoo.co.jp/diainfo/350/0" },
+    ],
+  },
   { id: "sanyo", name: "山陽電車 本線", section: "神戸三宮〜山陽姫路", color: "#e11d48", url: "https://transit.yahoo.co.jp/diainfo/354/0" },
 ];
 

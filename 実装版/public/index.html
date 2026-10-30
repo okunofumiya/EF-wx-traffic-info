@@ -100,14 +100,6 @@
           </div>
         </div>
       </section>
-
-      <!-- BAND -->
-      <section id="band" class="section">
-        <div class="section-head">
-          <h2>BAND 投稿履歴（プレビュー）</h2>
-        </div>
-        <div id="band-list" class="band-list"></div>
-      </section>
     </div>
 
     <!-- 1. 気象情報ページ -->
@@ -115,7 +107,7 @@
       <!-- 警報 -->
       <section id="warnings" class="section">
         <div class="section-head">
-          <h2>居住地の警報・注意報</h2>
+          <h2>警報・注意報</h2>
           <span id="area-count" class="count-pill"></span>
         </div>
         <div class="legend">
@@ -163,22 +155,13 @@
     <div id="page-roads" class="app-page" hidden>
       <section id="roads" class="section">
         <div class="section-head">
-          <h2>道路交通情報（区間所要時間）</h2>
+          <h2>道路交通情報</h2>
           <span id="road-count" class="count-pill"></span>
         </div>
         <div class="road-time-banner" id="road-time-banner">
           <span class="road-time-icon">🕒</span>
           <span id="road-checked-at">取得時刻を確認中...</span>
           <span class="road-source-tag" id="road-source-badge"></span>
-        </div>
-
-        <!-- マイルート（省スペース一覧表示・localStorage保存） -->
-        <div class="card commute-card" id="commute-card">
-          <div class="commute-head">
-            <h3 class="commute-title">マイルート</h3>
-            <button type="button" class="commute-add-btn" id="commute-add-btn">＋ ルートを登録</button>
-          </div>
-          <div id="commute-list" class="commute-list"></div>
         </div>
 
         <!-- 操作バー：凡例 ＆ 表示形式（マップ / リスト）切り替え -->
@@ -204,14 +187,36 @@
 
         <!-- 区間一覧リスト -->
         <div id="road-list-card" class="road-list" hidden></div>
+
+        <!-- マイルート（図形情報の下に配置・省スペース一覧表示・localStorage保存） -->
+        <div class="card commute-card" id="commute-card" style="margin-top:14px;margin-bottom:0">
+          <div class="commute-head">
+            <h3 class="commute-title">マイルート</h3>
+            <button type="button" class="commute-add-btn" id="commute-add-btn">＋ ルートを登録</button>
+          </div>
+          <div id="commute-list" class="commute-list"></div>
+        </div>
       </section>
     </div>
 
     <footer class="app-footer">
-      <p>気象情報：気象庁の公開データをもとに作成しています。</p>
-      <p>詳しい天気は各市町の「天気」リンク（Yahoo!天気）から確認できます。</p>
-      <p>交通情報：鉄道4路線（JR神戸線・JR加古川線・神戸電鉄・山陽電車）の運行有無、主要幹線道路の区間所要時間に対応しています。</p>
-      <p class="ver">v0.12.1-dev</p>
+      <div data-footer="summary">
+        <p>気象情報：気象庁の公開データ（約5分ごと更新）／ 鉄道運行情報：各社公開データ・Yahoo!路線情報（約5分ごと更新）</p>
+        <p>道路交通情報：Google Maps Routes API（7:00〜9:00・17:00〜19:00は10分ごと、9:00〜17:00は1時間ごと更新）</p>
+      </div>
+      <div data-footer="weather" hidden>
+        <p>気象情報：気象庁の公開データをもとに作成しています（約5分ごとに更新）。</p>
+        <p>詳しい天気は各市町の「天気」リンク（Yahoo!天気）から確認できます。</p>
+      </div>
+      <div data-footer="trains" hidden>
+        <p>鉄道運行情報：JR西日本・神戸電鉄の公開データおよびYahoo!路線情報をもとに運行情報の有無を自動反映しています（約5分ごとに更新）。</p>
+        <p>詳しい運行状況は各路線のリンク（Yahoo!路線情報）から確認できます。</p>
+      </div>
+      <div data-footer="roads" hidden>
+        <p>道路交通情報：Google Maps Platform（Routes API）の交通データをもとに各区間の所要時間を算出しています。</p>
+        <p>更新時間：7:00〜9:00・17:00〜19:00は10分ごと、9:00〜17:00は1時間ごとに更新（夜間19:00〜翌7:00は停止）。</p>
+      </div>
+      <p class="ver">v0.12.4-dev</p>
     </footer>
   </main>
 

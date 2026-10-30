@@ -50,8 +50,9 @@ test("buildWeatherAlertMessage: 警報発表時に正しくメッセージを組
   assert.match(msg, /【気象警報】発表・解除のお知らせ/);
   assert.match(msg, /・小野市：大雨警報/);
   assert.match(msg, /・三木市：暴風警報/);
+  assert.match(msg, /JR神戸線/);
+  assert.match(msg, /JR加古川線/);
   assert.match(msg, /神戸電鉄/);
-  assert.match(msg, /JR西日本/);
   assert.match(msg, /山陽電車/);
 });
 
@@ -93,7 +94,7 @@ test("buildShintetsuAlertMessage: 平常からお知らせありに変化した�
   const msg = buildShintetsuAlertMessage(curr, prev);
   assert.ok(msg);
   assert.match(msg, /【神戸電鉄】運行情報にお知らせがあります/);
-  assert.match(msg, /https:\/\/www\.shintetsu\.co\.jp\/railway\/railinfo\//);
+  assert.match(msg, /https:\/\/transit\.yahoo\.co\.jp\/diainfo\/353\/0/);
 });
 
 test("buildShintetsuAlertMessage: お知らせありから平常復帰したとき通知メッセージを生成", () => {

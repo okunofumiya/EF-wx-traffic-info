@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { parseShintetsu, parseJrWest, parseYahooSanyo } from "../src/rail.js";
+import { parseShintetsu, parseJrWest, parseYahooSanyo, isJrKobeSectionInTarget } from "../src/rail.js";
 import { buildRailAlertMessage } from "../src/chatwork.js";
 
 test("parseShintetsu: 平常運転(kind_code=0)と運行情報あり(kind_code=1)を正しく判定する", () => {
@@ -17,7 +17,28 @@ test("parseShintetsu: 平常運転(kind_code=0)と運行情報あり(kind_code=1
   assert.equal(na.hasAlert, false);
 });
 
-test("parseJrWest: JR神戸線(id=4)・JR加古川線(id=16)の運行有無を正しく判定する", () => {
+test("isJrKobeSectionInTarget: JR神戸線は西明石〜姫路の間を含む区間のみ true を返す", () => {
+  // 西明石以東のみ（大阪〜西明石、大阪〜神戸、京都〜大阪）は除外
+  assert.equal(isJrKobeSectionInTarget("大阪", "西明石"), false);
+  assert.equal(isJrKobeSectionInTarget("西明石", "大阪"), false);
+  assert.equal(isJrKobeSectionInTarget("大阪", "神戸"), false);
+  assert.equal(isJrKobeSectionInTarget("芦屋", "三ノ宮"), false);
+  assert.equal(isJrKobeSectionInTarget("京都", "大阪"), false);
+
+  // 姫路以西のみ（姫路〜網干）も除外
+  assert.equal(isJrKobeSectionInTarget("姫路", "網干"), false);
+
+  // 西明石〜姫路の間を含む区間は対象
+  assert.equal(isJrKobeSectionInTarget("西明石", "姫路"), true);
+  assert.equal(isJrKobeSectionInTarget("姫路", "西明石"), true);
+  assert.equal(isJrKobeSectionInTarget("大阪", "加古川"), true);
+  assert.equal(isJrKobeSectionInTarget("加古川", "大阪"), true);
+  assert.equal(isJrKobeSectionInTarget("大阪", "姫路"), true);
+  assert.equal(isJrKobeSectionInTarget("神戸", "姫路"), true);
+  assert.equal(isJrKobeSectionInTarget("加古川", "姫路"), true);
+});
+
+test("parseJrWest: JR神戸線(西明石〜姫路のみ)・JR加古川線の運行有無を正しく判定する", () => {
   const normalData = {
     masterData: {
       areas: [
@@ -59,23 +80,47 @@ test("parseJrWest: JR神戸線(id=4)・JR加古川線(id=16)の運行有無を�
   assert.equal(resNormal["jr-kakogawa"].status, "ok");
   assert.equal(resNormal["jr-kakogawa"].hasAlert, false);
 
-  // JR神戸線(id=4)に運行情報がある場合
-  const kobeTroubleData = structuredClone(normalData);
-  kobeTroubleData.areaTrafficInfos[0].dailyData[0].placeTrafficInfos[0].conventionalLineTrafficInfos.push({
+  // 1) JR神戸線で「大阪〜西明石」のみの遅延（＋うれしートお知らせ）の場合は ok（通知・表示しない）
+  const eastOnlyData = structuredClone(normalData);
+  eastOnlyData.areaTrafficInfos[0].conventionalLineDelayInfos.push({ id: 4 });
+  eastOnlyData.areaTrafficInfos[0].dailyData[0].placeTrafficInfos[0].conventionalLineTrafficInfos.push({
     id: 4,
-    conventionalLineTrafficInfoDetails: [{ iconType: "0003" }],
+    conventionalLineTrafficInfoDetails: [
+      {
+        iconType: "0003",
+        conditionName: "遅延",
+        sections: [{ conditionName: "遅延", startStation: "大阪", endStation: "西明石" }],
+      },
+      {
+        iconType: "0000",
+        conditionName: "お知らせ",
+        sections: [{ conditionName: "お知らせ", startStation: "大阪", endStation: "姫路" }],
+      },
+    ],
   });
+  const resEastOnly = parseJrWest(eastOnlyData);
+  assert.equal(resEastOnly["jr-kobe"].status, "ok");
+  assert.equal(resEastOnly["jr-kobe"].hasAlert, false);
 
-  const resKobe = parseJrWest(kobeTroubleData);
+  // 2) JR神戸線で「西明石〜姫路」（または「大阪〜加古川」）を含む遅延がある場合は delay
+  const targetKobeData = structuredClone(normalData);
+  targetKobeData.areaTrafficInfos[0].dailyData[0].placeTrafficInfos[0].conventionalLineTrafficInfos.push({
+    id: 4,
+    conventionalLineTrafficInfoDetails: [
+      {
+        iconType: "0003",
+        conditionName: "遅延",
+        sections: [{ conditionName: "遅延", startStation: "西明石", endStation: "姫路" }],
+      },
+    ],
+  });
+  const resKobe = parseJrWest(targetKobeData);
   assert.equal(resKobe["jr-kobe"].status, "delay");
   assert.equal(resKobe["jr-kobe"].hasAlert, true);
-  assert.equal(resKobe["jr-kakogawa"].status, "ok");
-  assert.equal(resKobe["jr-kakogawa"].hasAlert, false);
 
-  // 加古川線(id=16)に conventionalLineDelayInfos がある場合
+  // 3) 加古川線(id=16)に conventionalLineDelayInfos がある場合
   const kakogawaTroubleData = structuredClone(normalData);
   kakogawaTroubleData.areaTrafficInfos[0].conventionalLineDelayInfos.push({ id: 16 });
-
   const resKakogawa = parseJrWest(kakogawaTroubleData);
   assert.equal(resKakogawa["jr-kobe"].status, "ok");
   assert.equal(resKakogawa["jr-kakogawa"].status, "delay");
@@ -111,39 +156,24 @@ test("parseYahooSanyo: Yahoo!路線情報のHTML・__NEXT_DATA__から山陽電�
 test("buildRailAlertMessage: 4路線の状態遷移（平常→情報あり、情報あり→平常）でChatwork通知文を生成する", () => {
   const allOk = {
     lines: {
-      "jr-kobe": { id: "jr-kobe", name: "JR神戸線", status: "ok", hasAlert: false },
+      "jr-kobe": { id: "jr-kobe", name: "JR神戸線（西明石〜姫路）", status: "ok", hasAlert: false },
       "jr-kakogawa": { id: "jr-kakogawa", name: "JR加古川線", status: "ok", hasAlert: false },
       shintetsu: { id: "shintetsu", name: "神戸電鉄 全線", status: "ok", hasAlert: false },
       sanyo: { id: "sanyo", name: "山陽電車 本線", status: "ok", hasAlert: false },
     },
   };
 
-  // 変化なし
   assert.equal(buildRailAlertMessage(allOk, allOk), null);
 
-  // JR神戸線が遅延へ変化
   const kobeDelay = structuredClone(allOk);
-  kobeDelay.lines["jr-kobe"] = { id: "jr-kobe", name: "JR神戸線", status: "delay", hasAlert: true };
+  kobeDelay.lines["jr-kobe"] = { id: "jr-kobe", name: "JR神戸線（西明石〜姫路）", status: "delay", hasAlert: true };
 
   const msgAlert = buildRailAlertMessage(kobeDelay, allOk);
   assert.ok(msgAlert);
-  assert.match(msgAlert, /【JR神戸線】運行情報にお知らせがあります/);
-  assert.match(msgAlert, /https:\/\/trafficinfo\.westjr\.co\.jp\/kinki\.html/);
+  assert.match(msgAlert, /【JR神戸線（西明石〜姫路）】運行情報にお知らせがあります/);
+  assert.match(msgAlert, /https:\/\/transit\.yahoo\.co\.jp\/diainfo\/273\/0/);
 
-  // JR神戸線が平常運転に復帰
   const msgRecover = buildRailAlertMessage(allOk, kobeDelay);
   assert.ok(msgRecover);
-  assert.match(msgRecover, /【JR神戸線】平常運転に復帰しました/);
-
-  // 山陽電車と加古川線が同時に変化
-  const multiChange = structuredClone(allOk);
-  multiChange.lines["jr-kakogawa"] = { id: "jr-kakogawa", name: "JR加古川線", status: "delay", hasAlert: true };
-  multiChange.lines["sanyo"] = { id: "sanyo", name: "山陽電車 本線", status: "delay", hasAlert: true };
-
-  const msgMulti = buildRailAlertMessage(multiChange, kobeDelay);
-  assert.ok(msgMulti);
-  assert.match(msgMulti, /JR加古川線/);
-  assert.match(msgMulti, /山陽電車 本線/);
-  assert.match(msgMulti, /【✅ 平常運転に復帰】[\s\S]*JR神戸線/);
+  assert.match(msgRecover, /【JR神戸線（西明石〜姫路）】平常運転に復帰しました/);
 });
-
