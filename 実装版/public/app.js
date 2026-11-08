@@ -1,4 +1,4 @@
-/* 気象・交通状況ダッシュボード v0.12.4-dev（4ページタブ切替対応／気象：スナップショット対応／鉄道4路線連携［JR神戸線は西明石〜姫路限定］／道路交通情報・マイルート対応） */
+/* 気象・交通状況ダッシュボード v0.12.5-dev（4ページタブ切替対応／気象：スナップショット対応／鉄道4路線連携［JR神戸線は西明石〜姫路限定・Chatwork通知対象外］／道路交通情報・マイルート対応） */
 (() => {
   const LV_ORDER = { emergency: 4, danger: 3, warning: 2, advisory: 1 };
   const LV_CLASS = ["none", "advisory", "warning", "danger", "emergency"];

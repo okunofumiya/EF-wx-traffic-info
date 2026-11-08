@@ -113,26 +113,31 @@ export const RAIL_SOURCES = {
 };
 
 // 監視対象の4路線定義（リンク先はすべてYahoo!路線情報に統一）
+// ※JR神戸線はWebダッシュボードには表示するが、Chatwork通知対象外（notifyChatwork: false）
 export const RAIL_LINES = [
   {
     id: "jr-kobe",
     name: "JR神戸線（西明石〜姫路）",
     infoUrl: "https://transit.yahoo.co.jp/diainfo/273/0",
+    notifyChatwork: false,
   },
   {
     id: "jr-kakogawa",
     name: "JR加古川線",
     infoUrl: "https://transit.yahoo.co.jp/diainfo/334/0",
+    notifyChatwork: true,
   },
   {
     id: "shintetsu",
     name: "神戸電鉄 全線",
     infoUrl: "https://transit.yahoo.co.jp/diainfo/353/0",
+    notifyChatwork: true,
   },
   {
     id: "sanyo",
     name: "山陽電車 本線",
     infoUrl: "https://transit.yahoo.co.jp/diainfo/354/0",
+    notifyChatwork: true,
   },
 ];
 

@@ -153,7 +153,7 @@ test("parseYahooSanyo: Yahoo!路線情報のHTML・__NEXT_DATA__から山陽電�
   assert.equal(resDelay.hasAlert, true);
 });
 
-test("buildRailAlertMessage: 4路線の状態遷移（平常→情報あり、情報あり→平常）でChatwork通知文を生成する", () => {
+test("buildRailAlertMessage: JR神戸線は遅れ・復旧とも通知せず、他3路線（JR加古川線・神戸電鉄・山陽電車）のみChatwork通知文を生成する", () => {
   const allOk = {
     lines: {
       "jr-kobe": { id: "jr-kobe", name: "JR神戸線（西明石〜姫路）", status: "ok", hasAlert: false },
@@ -165,15 +165,30 @@ test("buildRailAlertMessage: 4路線の状態遷移（平常→情報あり、�
 
   assert.equal(buildRailAlertMessage(allOk, allOk), null);
 
+  // JR神戸線の遅れ発生・平常復帰では通知を出さない（null）
   const kobeDelay = structuredClone(allOk);
   kobeDelay.lines["jr-kobe"] = { id: "jr-kobe", name: "JR神戸線（西明石〜姫路）", status: "delay", hasAlert: true };
+  assert.equal(buildRailAlertMessage(kobeDelay, allOk), null);
+  assert.equal(buildRailAlertMessage(allOk, kobeDelay), null);
 
-  const msgAlert = buildRailAlertMessage(kobeDelay, allOk);
+  // JR加古川線の遅れ発生・平常復帰では通知を出す
+  const kakogawaDelay = structuredClone(allOk);
+  kakogawaDelay.lines["jr-kakogawa"] = { id: "jr-kakogawa", name: "JR加古川線", status: "delay", hasAlert: true };
+
+  const msgAlert = buildRailAlertMessage(kakogawaDelay, allOk);
   assert.ok(msgAlert);
-  assert.match(msgAlert, /【JR神戸線（西明石〜姫路）】運行情報にお知らせがあります/);
-  assert.match(msgAlert, /https:\/\/transit\.yahoo\.co\.jp\/diainfo\/273\/0/);
+  assert.match(msgAlert, /【JR加古川線】運行情報にお知らせがあります/);
+  assert.match(msgAlert, /https:\/\/transit\.yahoo\.co\.jp\/diainfo\/334\/0/);
 
-  const msgRecover = buildRailAlertMessage(allOk, kobeDelay);
+  const msgRecover = buildRailAlertMessage(allOk, kakogawaDelay);
   assert.ok(msgRecover);
-  assert.match(msgRecover, /【JR神戸線（西明石〜姫路）】平常運転に復帰しました/);
+  assert.match(msgRecover, /【JR加古川線】平常運転に復帰しました/);
+
+  // JR神戸線と山陽電車が同時に遅れた場合、山陽電車のみ通知される
+  const bothDelay = structuredClone(kobeDelay);
+  bothDelay.lines.sanyo = { id: "sanyo", name: "山陽電車 本線", status: "delay", hasAlert: true };
+  const msgSanyoOnly = buildRailAlertMessage(bothDelay, allOk);
+  assert.ok(msgSanyoOnly);
+  assert.match(msgSanyoOnly, /【山陽電車 本線】運行情報にお知らせがあります/);
+  assert.doesNotMatch(msgSanyoOnly, /JR神戸線/);
 });

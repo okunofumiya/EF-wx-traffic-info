@@ -136,7 +136,8 @@ export function buildShintetsuAlertMessage(curr, prev) {
 }
 
 /**
- * 鉄道4路線（JR神戸線・JR加古川線・神戸電鉄・山陽電車）の運行状況変化から Chatwork 用メッセージを生成する
+ * 鉄道路線の運行状況変化から Chatwork 用メッセージを生成する
+ * ※ notifyChatwork === false の路線（JR神戸線）は遅れ発生時も復旧時も通知対象外
  */
 export function buildRailAlertMessage(currRail, prevRail) {
   if (!currRail || !currRail.lines) return null;
@@ -146,6 +147,7 @@ export function buildRailAlertMessage(currRail, prevRail) {
   const recovered = [];
 
   for (const meta of RAIL_LINES) {
+    if (meta.notifyChatwork === false) continue;
     const curr = currRail.lines[meta.id];
     if (!curr || curr.status === "na") continue;
 
